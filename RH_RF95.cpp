@@ -34,13 +34,19 @@ RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi
 
 bool RH_RF95::init()
 {
-    if (!RHSPIDriver::init())
-	return false;
+    if (!RHSPIDriver::init()){
+        printf("spi driver failed to init.\n");
+	     return false;
+     }
 
     // Determine the interrupt number that corresponds to the interruptPin
     int interruptNumber = digitalPinToInterrupt(_interruptPin);
-    if (interruptNumber == NOT_AN_INTERRUPT)
-	return false;
+
+    //printf("digitalPinToInterrupt(%d)==%d\n", _interruptPin, interruptNumber);
+    if (interruptNumber == NOT_AN_INTERRUPT){
+      printf("could not attach interrupt.\n");
+	    return false;
+     }
 #ifdef RH_ATTACHINTERRUPT_TAKES_PIN_NUMBER
     interruptNumber = _interruptPin;
 #endif
@@ -53,8 +59,14 @@ bool RH_RF95::init()
     // Check we are in sleep mode, with LORA set
     if (spiRead(RH_RF95_REG_01_OP_MODE) != (RH_RF95_MODE_SLEEP | RH_RF95_LONG_RANGE_MODE))
     {
-//	Serial.println(spiRead(RH_RF95_REG_01_OP_MODE), HEX);
-	return false; // No device present?
+
+      printf("bad response to set OP_MODE [0x%02x], got 0x%02x, expected 0x%02x. Check the chip select is correct (using %d).\n",
+        RH_RF95_REG_01_OP_MODE,
+        spiRead(RH_RF95_REG_01_OP_MODE),
+        RH_RF95_MODE_SLEEP | RH_RF95_LONG_RANGE_MODE,
+        _slaveSelectPin);
+      //erial.println(spiRead(RH_RF95_REG_01_OP_MODE), HEX);
+	    return false; // No device present?
     }
 
     // Add by Adrien van den Bossche <vandenbo@univ-tlse2.fr> for Teensy
@@ -70,21 +82,30 @@ bool RH_RF95::init()
     // yourself based on knwledge of what Arduino board you are running on.
     if (_myInterruptIndex == 0xff)
     {
-	// First run, no interrupt allocated yet
-	if (_interruptCount <= RH_RF95_NUM_INTERRUPTS)
-	    _myInterruptIndex = _interruptCount++;
-	else
-	    return false; // Too many devices, not enough interrupt vectors
+    	// First run, no interrupt allocated yet
+    	if (_interruptCount <= RH_RF95_NUM_INTERRUPTS)
+    	    _myInterruptIndex = _interruptCount++;
+    	else{
+          printf("No more interrupts available in driver.\n");
+    	    return false; // Too many devices, not enough interrupt vectors
+        }
     }
     _deviceForInterrupt[_myInterruptIndex] = this;
     if (_myInterruptIndex == 0)
-	attachInterrupt(interruptNumber, isr0, RISING);
+	    attachInterrupt(interruptNumber, isr0, INT_EDGE_RISING);
     else if (_myInterruptIndex == 1)
-	attachInterrupt(interruptNumber, isr1, RISING);
+	    attachInterrupt(interruptNumber, isr1, INT_EDGE_RISING);
     else if (_myInterruptIndex == 2)
-	attachInterrupt(interruptNumber, isr2, RISING);
+	    attachInterrupt(interruptNumber, isr2, INT_EDGE_RISING);
     else
-	return false; // Too many devices, not enough interrupt vectors
+	    return false; // Too many devices, not enough interrupt vectors
+
+    // added by AMM, if the radio has a pending interrupt, we must clear it now
+    uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
+    if (irq_flags > 0){
+      printf("irq_flags: 0x%02x\n", irq_flags);
+    }
+    spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
 
     // Set up FIFO
     // We configure so that we can use the entire 256 byte FIFO for either receive
@@ -120,6 +141,8 @@ bool RH_RF95::init()
 // We use this to get RxDone and TxDone interrupts
 void RH_RF95::handleInterrupt()
 {
+  printf("handleInt\n");
+
     // Read the interrupt register
     uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
     if (_mode == RHModeRx && irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))

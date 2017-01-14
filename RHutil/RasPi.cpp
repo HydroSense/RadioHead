@@ -16,6 +16,13 @@
 //Initialize the values for sanity
 timeval RHStartTime;
 
+
+#ifdef __WIRING_PI_H__
+
+
+#endif
+
+#ifdef BCM2835_H
 void SPIClass::begin()
 {
   //Set SPI Defaults
@@ -91,6 +98,11 @@ void digitalWrite(unsigned char pin, unsigned char value)
 {
   bcm2835_gpio_write(pin,value);
 }
+
+#endif /* BCM2835_H */
+
+
+/* generic library functions below */
 
 unsigned long millis()
 {
@@ -173,4 +185,5 @@ size_t SerialSimulator::println(unsigned char ch, int base)
   printf("\n");
 }
 
-#endif
+
+#endif /* (RH_PLATFORM == RH_PLATFORM_RASPI) */

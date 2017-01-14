@@ -634,7 +634,14 @@ public:
     /// \return The maximum legal message length
     virtual uint8_t maxMessageLength();
 
-    /// Sets the transmitter and receiver 
+    // added by AMM
+    // get the last set freq.
+    float		getFrequency() {return (_freq * RH_RF95_FSTEP)/ 1000000.0;}
+    uint8_t		getBw() {return _bw;}
+    uint8_t		getCr() {return _cr;}
+    uint8_t		getSf() {return _sf;}
+
+    /// Sets the transmitter and receiver
     /// centre frequency.
     /// \param[in] centre Frequency in MHz. 137.0 to 1020.0. Caution: RFM95/96/97/98 comes in several
     /// different frequency ranges, and setting a frequency outside that range of your radio will probably not work
@@ -733,6 +740,11 @@ private:
 
     /// True when there is a valid message in the buffer
     volatile bool       _rxBufValid;
+
+    uint32_t			_freq;
+    uint8_t				_bw;
+    uint8_t				_cr;
+    uint8_t				_sf;
 };
 
 /// @example rf95_client.pde

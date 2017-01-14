@@ -17,6 +17,8 @@ HardwareSPI SPI(1);
 #elif (RH_PLATFORM == RH_PLATFORM_STM32STD) // STM32F4 Discovery
 // Declare an SPI interface to use
 HardwareSPI SPI(1);
+#elif (RH_PLATFORM == RH_PLATFORM_RASPI) // raspberry pi
+HardwareSPI SPI(1); // default to chanenl 0
 #endif
 
 // Arduino Due has default SPI pins on central SPI headers, and not on 10, 11, 12, 13
@@ -329,6 +331,8 @@ void RHHardwareSPI::begin()
      }
 
 #elif (RH_PLATFORM == RH_PLATFORM_RASPI) // Raspberry PI
+
+/*
   uint8_t dataMode;
   if (_dataMode == DataMode0)
     dataMode = BCM2835_SPI_MODE0;
@@ -345,27 +349,30 @@ void RHHardwareSPI::begin()
   else
     bitOrder = BCM2835_SPI_BIT_ORDER_MSBFIRST;
 
-  uint32_t divider;
+  uint32_t divider;*/
+  int mhz = 1e6;
+  int speed;
   switch (_frequency)
   {
     case Frequency1MHz:
     default:
-      divider = BCM2835_SPI_CLOCK_DIVIDER_256;
+      speed = 1 * mhz;
       break;
     case Frequency2MHz:
-      divider = BCM2835_SPI_CLOCK_DIVIDER_128;
+      speed = 2 * mhz;
       break;
     case Frequency4MHz:
-      divider = BCM2835_SPI_CLOCK_DIVIDER_64;
+      speed = 4 * mhz;
       break;
     case Frequency8MHz:
-      divider = BCM2835_SPI_CLOCK_DIVIDER_32;
+      speed = 8 * mhz;
       break;
     case Frequency16MHz:
-      divider = BCM2835_SPI_CLOCK_DIVIDER_16;
+      speed = 16 * mhz;
       break;
   }
-  SPI.begin(divider, bitOrder, dataMode);
+
+  SPI.begin(speed);
 #else
  #warning RHHardwareSPI does not support this platform yet. Consider adding it and contributing a patch.
 #endif

@@ -20,9 +20,17 @@ typedef unsigned char byte;
   #define NULL 0
 #endif
 
+#ifdef BCM2835_H
+
 #ifndef OUTPUT
   #define OUTPUT BCM2835_GPIO_FSEL_OUTP
 #endif
+
+#ifndef INPUT
+  #define INPUT BCM2835_GPIO_FSEL_INPT
+#endif
+
+#endif /* BCM2835_H */
 
 class SPIClass
 {
