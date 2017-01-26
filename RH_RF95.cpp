@@ -307,6 +307,7 @@ bool RH_RF95::setFrequency(float centre)
 {
     // Frf = FRF / FSTEP
     uint32_t frf = (centre * 1000000.0) / RH_RF95_FSTEP;
+    _freq = frf;
     spiWrite(RH_RF95_REG_06_FRF_MSB, (frf >> 16) & 0xff);
     spiWrite(RH_RF95_REG_07_FRF_MID, (frf >> 8) & 0xff);
     spiWrite(RH_RF95_REG_08_FRF_LSB, frf & 0xff);

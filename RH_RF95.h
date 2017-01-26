@@ -7,7 +7,7 @@
 // Author: Mike McCauley (mikem@airspayce.com)
 // Copyright (C) 2014 Mike McCauley
 // $Id: RH_RF95.h,v 1.12 2016/08/17 01:53:21 mikem Exp mikem $
-// 
+//
 
 #ifndef RH_RF95_h
 #define RH_RF95_h
@@ -29,7 +29,7 @@
 // The headers are inside the LORA's payload
 #define RH_RF95_HEADER_LEN 4
 
-// This is the maximum message length that can be supported by this driver. 
+// This is the maximum message length that can be supported by this driver.
 // Can be pre-defined to a smaller size (to save SRAM) prior to including this header
 // Here we allow for 1 byte message length, 4 bytes headers, user data and 2 bytes of FCS
 #ifndef RH_RF95_MAX_MESSAGE_LEN
@@ -211,7 +211,7 @@
 
 /////////////////////////////////////////////////////////////////////
 /// \class RH_RF95 RH_RF95.h <RH_RF95.h>
-/// \brief Driver to send and receive unaddressed, unreliable datagrams via a LoRa 
+/// \brief Driver to send and receive unaddressed, unreliable datagrams via a LoRa
 /// capable radio transceiver.
 ///
 /// For Semtech SX1276/77/78/79 and HopeRF RF95/96/97/98 and other similar LoRa capable radios.
@@ -224,22 +224,22 @@
 ///
 /// Works with
 /// - the excellent MiniWirelessLoRa from Anarduino http://www.anarduino.com/miniwireless
-/// - The excellent Modtronix inAir4 http://modtronix.com/inair4.html 
+/// - The excellent Modtronix inAir4 http://modtronix.com/inair4.html
 /// and inAir9 modules http://modtronix.com/inair9.html.
-/// - the excellent Rocket Scream Mini Ultra Pro with the RFM95W 
+/// - the excellent Rocket Scream Mini Ultra Pro with the RFM95W
 ///   http://www.rocketscream.com/blog/product/mini-ultra-pro-with-radio/
 /// - Lora1276 module from NiceRF http://www.nicerf.com/product_view.aspx?id=99
-/// - Adafruit Feather M0 with RFM95 
+/// - Adafruit Feather M0 with RFM95
 ///
 /// \par Overview
 ///
-/// This class provides basic functions for sending and receiving unaddressed, 
+/// This class provides basic functions for sending and receiving unaddressed,
 /// unreliable datagrams of arbitrary length to 251 octets per packet.
 ///
-/// Manager classes may use this class to implement reliable, addressed datagrams and streams, 
+/// Manager classes may use this class to implement reliable, addressed datagrams and streams,
 /// mesh routers, repeaters, translators etc.
 ///
-/// Naturally, for any 2 radios to communicate that must be configured to use the same frequency and 
+/// Naturally, for any 2 radios to communicate that must be configured to use the same frequency and
 /// modulation scheme.
 ///
 /// This Driver provides an object-oriented interface for sending and receiving data messages with Hope-RF
@@ -263,7 +263,7 @@
 /// also provided.
 ///
 /// Tested on MinWirelessLoRa with arduino-1.0.5
-/// on OpenSuSE 13.1. 
+/// on OpenSuSE 13.1.
 /// Also tested with Teensy3.1, Modtronix inAir4 and Arduino 1.6.5 on OpenSuSE 13.1
 ///
 /// \par Packet Format
@@ -274,7 +274,7 @@
 /// - 8 symbol PREAMBLE
 /// - Explicit header with header CRC (handled internally by the radio)
 /// - 4 octets HEADER: (TO, FROM, ID, FLAGS)
-/// - 0 to 251 octets DATA 
+/// - 0 to 251 octets DATA
 /// - CRC (handled internally by the radio)
 ///
 /// \par Connecting RFM95/96/97/98 and Semtech SX1276/77/78/79 to Arduino
@@ -288,7 +288,7 @@
 /// Arduino, otherwise you will also need voltage level shifters between the
 /// Arduino and the RFM95.  CAUTION, you must also ensure you connect an
 /// antenna.
-/// 
+///
 /// \code
 ///                 Arduino      RFM95/96/97/98
 ///                 GND----------GND   (ground in)
@@ -325,11 +325,11 @@
 ///
 /// Note that if you are using Modtronix inAir4 or inAir9,or any other module which uses the
 /// transmitter RFO pins and not the PA_BOOST pins
-/// that you must configure the power transmitter power for -1 to 14 dBm and with useRFO true. 
+/// that you must configure the power transmitter power for -1 to 14 dBm and with useRFO true.
 /// Failure to do that will result in extremely low transmit powers.
 ///
-/// If you have an Arduino M0 Pro from arduino.org, 
-/// you should note that you cannot use Pin 2 for the interrupt line 
+/// If you have an Arduino M0 Pro from arduino.org,
+/// you should note that you cannot use Pin 2 for the interrupt line
 /// (Pin 2 is for the NMI only). The same comments apply to Pin 4 on Arduino Zero from arduino.cc.
 /// Instead you can use any other pin (we use Pin 3) and initialise RH_RF69 like this:
 /// \code
@@ -339,7 +339,7 @@
 ///
 /// If you have a Rocket Scream Mini Ultra Pro with the RFM95W:
 /// - Ensure you have Arduino SAMD board support 1.6.5 or later in Arduino IDE 1.6.8 or later.
-/// - The radio SS is hardwired to pin D5 and the DIO0 interrupt to pin D2, 
+/// - The radio SS is hardwired to pin D5 and the DIO0 interrupt to pin D2,
 /// so you need to initialise the radio like this:
 /// \code
 /// RH_RF95 driver(5, 2);
@@ -349,7 +349,7 @@
 /// \code
 /// #define Serial SerialUSB
 /// \endcode
-/// - You also need this in setup before radio initialisation  
+/// - You also need this in setup before radio initialisation
 /// \code
 /// // Ensure serial flash is not interfering with radio communication on SPI bus
 ///  pinMode(4, OUTPUT);
@@ -365,13 +365,13 @@
 /// #include <RH_RF95.h>
 /// RH_RF95 rf95(5, 2); // Rocket Scream Mini Ultra Pro with the RFM95W
 /// #define Serial SerialUSB
-/// 
-/// void setup() 
+///
+/// void setup()
 /// {
 ///   // Ensure serial flash is not interfering with radio communication on SPI bus
 ///   pinMode(4, OUTPUT);
 ///   digitalWrite(4, HIGH);
-/// 
+///
 ///   Serial.begin(9600);
 ///   while (!Serial) ; // Wait for serial port to be available
 ///   if (!rf95.init())
@@ -395,7 +395,7 @@
 /// need to set the usual SS pin to be an output to force the Arduino into SPI
 /// master mode.
 ///
-/// Caution: Power supply requirements of the RFM module may be relevant in some circumstances: 
+/// Caution: Power supply requirements of the RFM module may be relevant in some circumstances:
 /// RFM95/96/97/98 modules are capable of pulling 120mA+ at full power, where Arduino's 3.3V line can
 /// give 50mA. You may need to make provision for alternate power supply for
 /// the RFM module, especially if you wish to use full transmit power, and/or you have
@@ -424,7 +424,7 @@
 /// more critical. Therefore, you should be vary sparing with RAM use in
 /// programs that use the RH_RF95 driver.
 ///
-/// It is often hard to accurately identify when you are hitting RAM limits on Arduino. 
+/// It is often hard to accurately identify when you are hitting RAM limits on Arduino.
 /// The symptoms can include:
 /// - Mysterious crashes and restarts
 /// - Changes in behaviour when seemingly unrelated changes are made (such as adding print() statements)
@@ -444,10 +444,10 @@
 ///
 /// It should be noted that at this data rate, a 12 octet message takes 2 seconds to transmit.
 ///
-/// At 20dBm (100mW) with Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on. 
+/// At 20dBm (100mW) with Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on.
 /// (Default medium range) in the conditions described above.
 /// - Range over flat ground through heavy trees and vegetation approx 2km.
-/// 
+///
 /// \par Transmitter Power
 ///
 /// You can control the transmitter power on the RF transceiver
@@ -480,10 +480,10 @@
 ///     15                          15
 ///     17                          16
 ///     19                          18
-///     20                          20 
-///     21                          21 
-///     22                          22 
-///     23                          23 
+///     20                          20
+///     21                          21
+///     22                          22
+///     23                          23
 /// \endcode
 ///
 /// We have also measured the actual power output from a Modtronix inAir4 http://modtronix.com/inair4.html
@@ -506,7 +506,7 @@
 ///     13                         15
 ///     14                         16
 /// \endcode
-/// (Caution: we dont claim laboratory accuracy for these power measurements)
+/// (Caution: we don't claim laboratory accuracy for these power measurements)
 /// You would not expect to get anywhere near these powers to air with a simple 1/4 wavelength wire antenna.
 class RH_RF95 : public RHSPIDriver
 {
@@ -524,18 +524,18 @@ public:
 	uint8_t    reg_1e;   ///< Value for register RH_RF95_REG_1E_MODEM_CONFIG2
 	uint8_t    reg_26;   ///< Value for register RH_RF95_REG_26_MODEM_CONFIG3
     } ModemConfig;
-  
+
     /// Choices for setModemConfig() for a selected subset of common
     /// data rates. If you need another configuration,
     /// determine the necessary settings and call setModemRegisters() with your
-    /// desired settings. It might be helpful to use the LoRa calculator mentioned in 
+    /// desired settings. It might be helpful to use the LoRa calculator mentioned in
     /// http://www.semtech.com/images/datasheet/LoraDesignGuide_STD.pdf
     /// These are indexes into MODEM_CONFIG_TABLE. We strongly recommend you use these symbolic
     /// definitions and not their integer equivalents: its possible that new values will be
     /// introduced in later versions (though we will try to avoid it).
     /// Caution: if you are using slow packet rates and long packets with RHReliableDatagram or subclasses
     /// you may need to change the RHReliableDatagram timeout for reliable operations.
-    /// Caution: for some slow rates nad with ReliableDatagrams youi may need to increase the reply timeout 
+    /// Caution: for some slow rates nad with ReliableDatagrams youi may need to increase the reply timeout
     /// with manager.setTimeout() to
     /// deal with the long transmission times.
     typedef enum
@@ -552,21 +552,21 @@ public:
     /// distinct interrupt lines, one for each instance.
     /// \param[in] slaveSelectPin the Arduino pin number of the output to use to select the RH_RF22 before
     /// accessing it. Defaults to the normal SS pin for your Arduino (D10 for Diecimila, Uno etc, D53 for Mega, D10 for Maple)
-    /// \param[in] interruptPin The interrupt Pin number that is connected to the RFM DIO0 interrupt line. 
+    /// \param[in] interruptPin The interrupt Pin number that is connected to the RFM DIO0 interrupt line.
     /// Defaults to pin 2, as required by Anarduino MinWirelessLoRa module.
     /// Caution: You must specify an interrupt capable pin.
     /// On many Arduino boards, there are limitations as to which pins may be used as interrupts.
     /// On Leonardo pins 0, 1, 2 or 3. On Mega2560 pins 2, 3, 18, 19, 20, 21. On Due and Teensy, any digital pin.
     /// On Arduino Zero from arduino.cc, any digital pin other than 4.
     /// On Arduino M0 Pro from arduino.org, any digital pin other than 2.
-    /// On other Arduinos pins 2 or 3. 
+    /// On other Arduinos pins 2 or 3.
     /// See http://arduino.cc/en/Reference/attachInterrupt for more details.
     /// On Chipkit Uno32, pins 38, 2, 7, 8, 35.
     /// On other boards, any digital pin may be used.
-    /// \param[in] spi Pointer to the SPI interface object to use. 
+    /// \param[in] spi Pointer to the SPI interface object to use.
     ///                Defaults to the standard Arduino hardware SPI interface
     RH_RF95(uint8_t slaveSelectPin = SS, uint8_t interruptPin = 2, RHGenericSPI& spi = hardware_spi);
-  
+
     /// Initialise the Driver transport hardware and software.
     /// Make sure the Driver is properly configured before calling init().
     /// \return true if initialisation succeeded.
@@ -578,20 +578,20 @@ public:
     /// \return true on success
     bool printRegisters();
 
-    /// Sets all the registered required to configure the data modem in the RF95/96/97/98, including the bandwidth, 
-    /// spreading factor etc. You can use this to configure the modem with custom configurations if none of the 
+    /// Sets all the registered required to configure the data modem in the RF95/96/97/98, including the bandwidth,
+    /// spreading factor etc. You can use this to configure the modem with custom configurations if none of the
     /// canned configurations in ModemConfigChoice suit you.
     /// \param[in] config A ModemConfig structure containing values for the modem configuration registers.
     void           setModemRegisters(const ModemConfig* config);
 
-    /// Select one of the predefined modem configurations. If you need a modem configuration not provided 
+    /// Select one of the predefined modem configurations. If you need a modem configuration not provided
     /// here, use setModemRegisters() with your own ModemConfig.
     /// \param[in] index The configuration choice.
     /// \return true if index is a valid choice.
     bool        setModemConfig(ModemConfigChoice index);
 
     /// Tests whether a new message is available
-    /// from the Driver. 
+    /// from the Driver.
     /// On most drivers, this will also put the Driver into RHModeRx mode until
     /// a message is actually received by the transport, when it wil be returned to RHModeIdle.
     /// This can be called multiple times in a timeout loop
@@ -610,10 +610,10 @@ public:
     virtual bool    recv(uint8_t* buf, uint8_t* len);
 
     /// Waits until any previous transmit packet is finished being transmitted with waitPacketSent().
-    /// Then optionally waits for Channel Activity Detection (CAD) 
+    /// Then optionally waits for Channel Activity Detection (CAD)
     /// to show the channnel is clear (if the radio supports CAD) by calling waitCAD().
     /// Then loads a message into the transmitter and starts the transmitter. Note that a message length
-    /// of 0 is permitted. 
+    /// of 0 is permitted.
     /// \param[in] data Array of data to be sent
     /// \param[in] len Number of bytes of data to send
     /// specify the maximum time in ms to wait. If 0 (the default) do not wait for CAD before transmitting.
@@ -622,14 +622,14 @@ public:
     virtual bool    send(const uint8_t* data, uint8_t len);
 
     /// Sets the length of the preamble
-    /// in bytes. 
-    /// Caution: this should be set to the same 
+    /// in bytes.
+    /// Caution: this should be set to the same
     /// value on all nodes in your network. Default is 8.
     /// Sets the message preamble length in RH_RF95_REG_??_PREAMBLE_?SB
-    /// \param[in] bytes Preamble length in bytes.  
+    /// \param[in] bytes Preamble length in bytes.
     void           setPreambleLength(uint16_t bytes);
 
-    /// Returns the maximum message length 
+    /// Returns the maximum message length
     /// available in this Driver.
     /// \return The maximum legal message length
     virtual uint8_t maxMessageLength();
@@ -648,11 +648,11 @@ public:
     /// \return true if the selected frquency centre is within range
     bool        setFrequency(float centre);
 
-    /// If current mode is Rx or Tx changes it to Idle. If the transmitter or receiver is running, 
+    /// If current mode is Rx or Tx changes it to Idle. If the transmitter or receiver is running,
     /// disables them.
     void           setModeIdle();
 
-    /// If current mode is Tx or Idle, changes it to Rx. 
+    /// If current mode is Tx or Idle, changes it to Rx.
     /// Starts the receiver in the RF95/96/97/98.
     void           setModeRx();
 
@@ -662,27 +662,27 @@ public:
 
     /// Sets the transmitter power output level, and configures the transmitter pin.
     /// Be a good neighbour and set the lowest power level you need.
-    /// Some SX1276/77/78/79 and compatible modules (such as RFM95/96/97/98) 
+    /// Some SX1276/77/78/79 and compatible modules (such as RFM95/96/97/98)
     /// use the PA_BOOST transmitter pin for high power output (and optionally the PA_DAC)
-    /// while some (such as the Modtronix inAir4 and inAir9) 
+    /// while some (such as the Modtronix inAir4 and inAir9)
     /// use the RFO transmitter pin for lower power but higher efficiency.
     /// You must set the appropriate power level and useRFO argument for your module.
     /// Check with your module manufacturer which transmtter pin is used on your module
-    /// to ensure you are setting useRFO correctly. 
-    /// Failure to do so will result in very low 
+    /// to ensure you are setting useRFO correctly.
+    /// Failure to do so will result in very low
     /// transmitter power output.
     /// Caution: legal power limits may apply in certain countries.
     /// After init(), the power will be set to 13dBm, with useRFO false (ie PA_BOOST enabled).
-    /// \param[in] power Transmitter power level in dBm. For RFM95/96/97/98 LORA with useRFO false, 
+    /// \param[in] power Transmitter power level in dBm. For RFM95/96/97/98 LORA with useRFO false,
     /// valid values are from +5 to +23.
-    /// For Modtronix inAir4 and inAir9 with useRFO true (ie RFO pins in use), 
+    /// For Modtronix inAir4 and inAir9 with useRFO true (ie RFO pins in use),
     /// valid values are from -1 to 14.
     /// \param[in] useRFO If true, enables the use of the RFO transmitter pins instead of
     /// the PA_BOOST pin (false). Choose the correct setting for your module.
     void           setTxPower(int8_t power, bool useRFO = false);
 
     /// Sets the radio into low-power sleep mode.
-    /// If successful, the transport will stay in sleep mode until woken by 
+    /// If successful, the transport will stay in sleep mode until woken by
     /// changing mode it idle, transmit or receive (eg by calling send(), recv(), available() etc)
     /// Caution: there is a time penalty as the radio takes a finite time to wake from sleep mode.
     /// \return true if sleep mode was successfully entered.
@@ -694,7 +694,7 @@ public:
     /// To be used in a listen-before-talk mechanism (Collision Avoidance)
     /// with a reasonable time backoff algorithm.
     /// This is called automatically by waitCAD().
-    /// \return true if channel is in use.  
+    /// \return true if channel is in use.
     virtual bool    isChannelActive();
 
 protected:
@@ -734,7 +734,7 @@ private:
 
     /// Number of octets in the buffer
     volatile uint8_t    _bufLen;
-    
+
     /// The receiver/transmitter buffer
     uint8_t             _buf[RH_RF95_MAX_PAYLOAD_LEN];
 
@@ -753,4 +753,3 @@ private:
 /// @example rf95_reliable_datagram_server.pde
 
 #endif
-

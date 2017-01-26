@@ -850,10 +850,13 @@
  #define RH_HAVE_HARDWARE_SPI
  #define RH_HAVE_SERIAL
  #define PROGMEM
- #include <RHutil/RasPi.h>
+
+// modified by AMM to use wiring pi
+ #include <RHutil/RasPiWiring.h>
  #include <string.h>
+ #define memcpy_P memcpy
  //Define SS for CS0 or pin 24
- #define SS 8
+ //#define SS 8
 
 #elif (RH_PLATFORM == RH_PLATFORM_NRF51)
  #define RH_HAVE_SERIAL
