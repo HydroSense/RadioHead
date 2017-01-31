@@ -5,9 +5,11 @@
 // $Id: RH_NRF51.cpp,v 1.1 2015/07/01 00:46:05 mikem Exp $
 
 // Set by Arduino IDE and RadioHead.h when compiling for nRF51 or nRF52 chips:
-#if RH_PLATFORM==RH_PLATFORM_NRF51
 
 #include <RH_NRF51.h>
+
+#if RH_PLATFORM==RH_PLATFORM_NRF51
+
 
 RH_NRF51::RH_NRF51()
     : _rxBufValid(false)
@@ -25,7 +27,7 @@ bool RH_NRF51::init()
     /* Wait for the external oscillator to start up */
     while (NRF_CLOCK->EVENTS_HFCLKSTARTED == 0)
 	;
-    
+
     // Disable and reset the radio
     NRF_RADIO->POWER = RADIO_POWER_POWER_Disabled;
     NRF_RADIO->POWER = RADIO_POWER_POWER_Enabled;
@@ -40,7 +42,7 @@ bool RH_NRF51::init()
 
     // Configure the CRC
     NRF_RADIO->CRCCNF = (RADIO_CRCCNF_LEN_Two << RADIO_CRCCNF_LEN_Pos); // Number of checksum bits
-    NRF_RADIO->CRCINIT = 0xFFFFUL;      // Initial value      
+    NRF_RADIO->CRCINIT = 0xFFFFUL;      // Initial value
     NRF_RADIO->CRCPOLY = 0x11021UL;     // CRC poly: x^16+x^12^x^5+1
 
     // These shorts will make the radio transition from Ready to Start to Disable automatically
@@ -153,7 +155,7 @@ void RH_NRF51::setModeRx()
 	// Maybe set the AES CCA module for the correct encryption mode
 	if (_encrypting)
 	    NRF_CCM->MODE = (CCM_MODE_MODE_Decryption << CCM_MODE_MODE_Pos); // Decrypt
-	NRF_CCM->MICSTATUS = 0;	
+	NRF_CCM->MICSTATUS = 0;
 #endif
 
 	// Radio will transition automatically to Disable state when a message is received
@@ -181,7 +183,7 @@ void RH_NRF51::setModeTx()
 	// Maybe set the AES CCA module for the correct encryption mode
 	if (_encrypting)
 	    NRF_CCM->MODE = (CCM_MODE_MODE_Encryption << CCM_MODE_MODE_Pos); // Encrypt
-#endif	    
+#endif
 	// Radio will transition automatically to Disable state at the end of transmission
 	NRF_RADIO->PACKETPTR = (uint32_t)_buf;
 	NRF_RADIO->EVENTS_READY = 0U;
@@ -201,7 +203,7 @@ bool RH_NRF51::send(const uint8_t* data, uint8_t len)
 	return false;
 #endif
 
-    if (!waitCAD()) 
+    if (!waitCAD())
 	return false;  // Check channel activity
 
     // Set up the headers
@@ -303,7 +305,7 @@ void RH_NRF51::setEncryptionKey(uint8_t* key)
 
 	// SHORT from RADIO READY to AESCCM KSGEN using PPI predefined channel 24
 	// Also RADIO ADDRESS to AESCCM CRYPT using PPI predefined channel 25
-	NRF_PPI->CHENSET =   (PPI_CHENSET_CH24_Enabled << PPI_CHENSET_CH24_Pos) 
+	NRF_PPI->CHENSET =   (PPI_CHENSET_CH24_Enabled << PPI_CHENSET_CH24_Pos)
 	                   | (PPI_CHENSET_CH25_Enabled << PPI_CHENSET_CH25_Pos)
 	    ;
 
@@ -342,12 +344,12 @@ bool RH_NRF51::available()
 #endif
         if (!NRF_RADIO->CRCSTATUS)
 	{
-	    // Bad CRC, restart the radio	    
+	    // Bad CRC, restart the radio
 	    _rxBad++;
 	    setModeRx();
 	    return false;
 	}
-	validateRxBuf(); 
+	validateRxBuf();
 	if (!_rxBufValid)
 	    setModeRx(); // Try for another
     }
@@ -389,7 +391,7 @@ float RH_NRF51::get_temperature()
 {
     NRF_TEMP->EVENTS_DATARDY = 0;
     NRF_TEMP->TASKS_START = 1;
-    
+
     while (!NRF_TEMP->EVENTS_DATARDY)
 	;
     return NRF_TEMP->TEMP * 0.25;
