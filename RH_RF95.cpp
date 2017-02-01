@@ -5,6 +5,8 @@
 
 #include <RH_RF95.h>
 
+
+
 // Interrupt vectors for the 3 Arduino interrupt pins
 // Each interrupt can be handled by a different instance of RH_RF95, allowing you to have
 // 2 or more LORAs per Arduino
@@ -70,6 +72,10 @@ bool RH_RF95::init()
     return false; // No device present?
   }
 
+  _perf.interrupt_count = 0;
+  _perf.rx_timeout = 0;
+  _perf.rx_crc_err = 0;
+  _perf.cad_cnt = 0;
   // Add by Adrien van den Bossche <vandenbo@univ-tlse2.fr> for Teensy
   // ARM M4 requires the below. else pin interrupt doesn't work properly.
   // On all other platforms, its innocuous, belt and braces
@@ -93,19 +99,19 @@ bool RH_RF95::init()
   }
   _deviceForInterrupt[_myInterruptIndex] = this;
   if (_myInterruptIndex == 0)
-  attachInterrupt(interruptNumber, isr0, RISING);
+    attachInterrupt(interruptNumber, isr0, RISING);
   else if (_myInterruptIndex == 1)
-  attachInterrupt(interruptNumber, isr1, RISING);
+    attachInterrupt(interruptNumber, isr1, RISING);
   else if (_myInterruptIndex == 2)
-  attachInterrupt(interruptNumber, isr2, RISING);
+    attachInterrupt(interruptNumber, isr2, RISING);
   else
-  return false; // Too many devices, not enough interrupt vectors
+    return false; // Too many devices, not enough interrupt vectors
 
   // added by AMM, if the radio has a pending interrupt, we must clear it now
   uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
-  if (irq_flags > 0){
-    printf("irq_flags: 0x%02x\n", irq_flags);
-  }
+  // if (irq_flags > 0){
+  //   printf("irq_flags: 0x%02x\n", irq_flags);
+  // }
   spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
 
   // Set up FIFO
@@ -120,17 +126,22 @@ bool RH_RF95::init()
   // RX mode is implmented with RXCONTINUOUS
   // max message data length is 255 - 4 = 251 octets
 
-  setModeIdle();
+  // turn LNA gain up and LNA boost
+  spiWrite(RH_RF95_REG_0C_LNA, 0x23); // G1 = maximum gain, LNA Boost 150% current
 
   // Set up default configuration
   // No Sync Words in LORA mode.
   setModemConfig(Bw125Cr45Sf128); // Radio default
   //    setModemConfig(Bw125Cr48Sf4096); // slow and reliable?
-  setPreambleLength(8); // Default is 8
+  //setPreambleLength(8); // Default is 8
   // An innocuous ISM frequency, same as RF22's
-  setFrequency(434.0);
+  // leave radio at default frequency
+  // setFrequency(434.0);
   // Lowish power
-  setTxPower(13);
+  // leave radio at default power
+  // setTxPower(13);
+
+  setModeIdle();
 
   return true;
 }
@@ -142,16 +153,31 @@ bool RH_RF95::init()
 // We use this to get RxDone and TxDone interrupts
 void RH_RF95::handleInterrupt()
 {
-  printf("handleInt\n");
+  _perf.interrupt = millis();
+  _perf.interrupt_count ++;
 
   // Read the interrupt register
   uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
   if (_mode == RHModeRx && irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))
   {
+    if (irq_flags & RH_RF95_RX_TIMEOUT){
+      _perf.rx_timeout ++;
+    }
+    if (irq_flags & RH_RF95_PAYLOAD_CRC_ERROR){
+      _perf.rx_crc_err ++;
+    }
     _rxBad++;
+  }
+  else if (_mode == RHModeRx && irq_flags & RH_RF95_CAD_DONE){
+    // CAD detected, just get the time and wait for RxDone
+    _perf.cad_done = millis();
+    _perf.cad_cnt++;
+    spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x00); // Interrupt on RxDone
   }
   else if (_mode == RHModeRx && irq_flags & RH_RF95_RX_DONE)
   {
+    _perf.rx_done= millis();
+
     // Have received a packet
     uint8_t len = spiRead(RH_RF95_REG_13_RX_NB_BYTES);
 
@@ -159,6 +185,7 @@ void RH_RF95::handleInterrupt()
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, spiRead(RH_RF95_REG_10_FIFO_RX_CURRENT_ADDR));
     spiBurstRead(RH_RF95_REG_00_FIFO, _buf, len);
     _bufLen = len;
+    _perf.recv_bytes = len;
     spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
 
     // Remember the RSSI of this packet
@@ -169,7 +196,7 @@ void RH_RF95::handleInterrupt()
     // We have received a message.
     validateRxBuf();
     if (_rxBufValid)
-    setModeIdle(); // Got one
+      setModeIdle(); // Got one
   }
   else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
   {
@@ -178,8 +205,17 @@ void RH_RF95::handleInterrupt()
   }
   else if (_mode == RHModeCad && irq_flags & RH_RF95_CAD_DONE)
   {
+    _perf.cad_done = millis();
+    _perf.cad_cnt++;
     _cad = irq_flags & RH_RF95_CAD_DETECTED;
-    setModeIdle();
+    if (_cad){
+      //get the packet
+      setModeRx();
+    }else{
+      setModeIdle();
+      //keep checking.
+      //setModeCAD();
+    }
   }
 
   spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
@@ -207,8 +243,11 @@ void RH_RF95::isr2()
 // Check whether the latest received message is complete and uncorrupted
 void RH_RF95::validateRxBuf()
 {
+
+#ifdef RH_RF95_SEND_RH_HEADER
   if (_bufLen < 4)
-  return; // Too short to be a real message
+    return; // Too short to be a real message
+
   // Extract the 4 headers
   _rxHeaderTo    = _buf[0];
   _rxHeaderFrom  = _buf[1];
@@ -221,6 +260,10 @@ void RH_RF95::validateRxBuf()
       _rxGood++;
       _rxBufValid = true;
     }
+#else
+  _rxGood++;
+  _rxBufValid = true;
+#endif
   }
 
   bool RH_RF95::available()
@@ -229,6 +272,7 @@ void RH_RF95::validateRxBuf()
       return false;
     }
     setModeRx();
+
     return _rxBufValid; // Will be set by the interrupt handler when a good message is received
   }
 
@@ -243,14 +287,22 @@ void RH_RF95::validateRxBuf()
   bool RH_RF95::recv(uint8_t* buf, uint8_t* len)
   {
     if (!available())
-    return false;
+      return false;
     if (buf && len)
     {
       ATOMIC_BLOCK_START;
+
+#ifdef RH_RF95_SEND_RH_HEADER
       // Skip the 4 headers that are at the beginning of the rxBuf
       if (*len > _bufLen-RH_RF95_HEADER_LEN)
-      *len = _bufLen-RH_RF95_HEADER_LEN;
+        *len = _bufLen-RH_RF95_HEADER_LEN;
       memcpy(buf, _buf+RH_RF95_HEADER_LEN, *len);
+#else
+      if (*len > _bufLen)
+        *len = _bufLen;
+      memcpy(buf, _buf, *len);
+#endif
+
       ATOMIC_BLOCK_END;
     }
     clearRxBuf(); // This message accepted and cleared
@@ -259,17 +311,21 @@ void RH_RF95::validateRxBuf()
 
   bool RH_RF95::send(const uint8_t* data, uint8_t len)
   {
+    _perf.send_call = millis();
+
     if (len > RH_RF95_MAX_MESSAGE_LEN)
-    return false;
+      return false;
 
     waitPacketSent(); // Make sure we dont interrupt an outgoing message
     setModeIdle();
 
     if (!waitCAD())
-    return false;  // Check channel activity
+      return false;  // Check channel activity
 
     // Position at the beginning of the FIFO
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, 0);
+
+#ifdef RH_RF95_SEND_RH_HEADER
     // The headers
     spiWrite(RH_RF95_REG_00_FIFO, _txHeaderTo);
     spiWrite(RH_RF95_REG_00_FIFO, _txHeaderFrom);
@@ -278,6 +334,13 @@ void RH_RF95::validateRxBuf()
     // The message data
     spiBurstWrite(RH_RF95_REG_00_FIFO, data, len);
     spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len + RH_RF95_HEADER_LEN);
+    _pref.sent_bytes = len+ RH_RF95_HEADER_LEN;
+#else
+    // The message data
+    spiBurstWrite(RH_RF95_REG_00_FIFO, data, len);
+    spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len);
+    _perf.sent_bytes = len;
+#endif
 
     setModeTx(); // Start the transmitter
     // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
@@ -335,13 +398,23 @@ void RH_RF95::validateRxBuf()
     }
     return true;
   }
-
+  void RH_RF95::setModeCAD(){
+    if (_mode != RHModeCad)
+    {
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_CAD);
+      spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x80); // Interrupt on CadDone (same as CadDetected)
+      _mode = RHModeCad;
+    }
+  }
   void RH_RF95::setModeRx()
   {
     if (_mode != RHModeRx)
     {
       spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_RXCONTINUOUS);
+      //spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_RXSINGLE);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x00); // Interrupt on RxDone
+
+      //spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x40); // Preamble detect
       _mode = RHModeRx;
     }
   }
@@ -350,42 +423,51 @@ void RH_RF95::validateRxBuf()
   {
     if (_mode != RHModeTx)
     {
+      _perf.tx_mode = millis();
       spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_TX);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x40); // Interrupt on TxDone
       _mode = RHModeTx;
     }
   }
 
-  void RH_RF95::setTxPower(int8_t power, bool useRFO)
+  void RH_RF95::setTxPower(int8_t power)
   {
+    // rewritten to always use PA_BOOST since RFO pin doesn't seem to be connected.
+
     // Sigh, different behaviours depending on whther the module use PA_BOOST or the RFO pin
     // for the transmitter output
-    if (useRFO)
-    {
-      if (power > 14)
-      power = 14;
-      if (power < -1)
-      power = -1;
-      spiWrite(RH_RF95_REG_09_PA_CONFIG, RH_RF95_MAX_POWER | (power + 1));
-    }
-    else
+    // if (useRFO)
+    // {
+    //   if (power > 14)
+    //     power = 14;
+    //   if (power < -1)
+    //     power = -1;
+    //   spiWrite(RH_RF95_REG_09_PA_CONFIG, RH_RF95_MAX_POWER | (power + 1));
+    // }
+    // else
     {
       if (power > 23)
-      power = 23;
+        power = 23;
       if (power < 5)
-      power = 5;
+        power = 5;
 
       // For RH_RF95_PA_DAC_ENABLE, manual says '+20dBm on PA_BOOST when OutputPower=0xf'
       // RH_RF95_PA_DAC_ENABLE actually adds about 3dBm to all power levels. We will us it
       // for 21, 22 and 23dBm
       if (power > 20)
       {
-        spiWrite(RH_RF95_REG_4D_PA_DAC, RH_RF95_PA_DAC_ENABLE);
+        spiWrite(RH_RF95_REG_4D_PA_DAC, RH_RF95_PA_DAC_RESERVED | RH_RF95_PA_DAC_ENABLE);
         power -= 3;
+
+        //turn up OCP to 120mA
+        spiWrite(RH_RF95_REG_0B_OCP, RH_RF95_OCP_ON | 15);
       }
       else
       {
-        spiWrite(RH_RF95_REG_4D_PA_DAC, RH_RF95_PA_DAC_DISABLE);
+        spiWrite(RH_RF95_REG_4D_PA_DAC, RH_RF95_PA_DAC_RESERVED | RH_RF95_PA_DAC_DISABLE);
+
+        //turn up OCP to default seeting of 100 mA
+        spiWrite(RH_RF95_REG_0B_OCP, RH_RF95_OCP_ON | 11);
       }
 
       // RFM95/96/97/98 does not have RFO pins connected to anything. Only PA_BOOST
@@ -394,6 +476,9 @@ void RH_RF95::validateRxBuf()
       // The documentation is pretty confusing on this topic: PaSelect says the max power is 20dBm,
       // but OutputPower claims it would be 17dBm.
       // My measurements show 20dBm is correct
+
+      // power is in the range [5, ..., 20]
+      // output power is 17 - (15-power), so 7 .. 23 dBm
       spiWrite(RH_RF95_REG_09_PA_CONFIG, RH_RF95_PA_SELECT | (power-5));
     }
   }
@@ -425,6 +510,9 @@ void RH_RF95::validateRxBuf()
 
   void RH_RF95::setPreambleLength(uint16_t bytes)
   {
+    //the radio adds 4 symbols, the minimum is 6+4 = 10 symbols in LoRa mode
+    if (bytes < 6)
+      bytes = 6;
     spiWrite(RH_RF95_REG_20_PREAMBLE_MSB, bytes >> 8);
     spiWrite(RH_RF95_REG_21_PREAMBLE_LSB, bytes & 0xff);
   }

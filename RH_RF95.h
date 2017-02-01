@@ -25,6 +25,7 @@
 // We use some for headers, keeping fewer for RadioHead messages
 #define RH_RF95_MAX_PAYLOAD_LEN RH_RF95_FIFO_SIZE
 
+//#define RH_RF95_SEND_RH_HEADER
 // The length of the headers we add.
 // The headers are inside the LORA's payload
 #define RH_RF95_HEADER_LEN 4
@@ -206,6 +207,7 @@
 #define RH_RF95_SYM_TIMEOUT_MSB                       0x03
 
 // RH_RF95_REG_4D_PA_DAC                              0x4d
+#define RH_RF95_PA_DAC_RESERVED                       0x10
 #define RH_RF95_PA_DAC_DISABLE                        0x04
 #define RH_RF95_PA_DAC_ENABLE                         0x07
 
@@ -511,6 +513,23 @@
 class RH_RF95 : public RHSPIDriver
 {
 public:
+
+  // debug & performance counters
+  struct perf_counter {
+    uint32_t  interrupt_count;
+    uint32_t  rx_timeout;
+    uint32_t  rx_crc_err;
+
+    uint32_t  cad_cnt;
+    uint32_t  cad_done;
+    uint32_t  rx_done;
+    uint32_t  send_call;
+    uint32_t  tx_mode;
+    uint32_t  interrupt;
+    uint8_t   sent_bytes;
+    uint8_t   recv_bytes;
+  };
+
   /// \brief Defines register values for a set of modem configuration registers
   ///
   /// Defines register values for a set of modem configuration registers
@@ -644,6 +663,9 @@ public:
   uint8_t		getCr() {return _cr;}
   uint8_t		getSf() {return _sf;}
 
+  // returns performance counter struct
+  struct perf_counter*  getPerf(){return &_perf;}
+
   /// Sets the transmitter and receiver
   /// centre frequency.
   /// \param[in] centre Frequency in MHz. 137.0 to 1020.0. Caution: RFM95/96/97/98 comes in several
@@ -658,6 +680,7 @@ public:
   /// If current mode is Tx or Idle, changes it to Rx.
   /// Starts the receiver in the RF95/96/97/98.
   void           setModeRx();
+  void           setModeCAD();
 
   /// If current mode is Rx or Idle, changes it to Rx. F
   /// Starts the transmitter in the RF95/96/97/98.
@@ -682,7 +705,7 @@ public:
   /// valid values are from -1 to 14.
   /// \param[in] useRFO If true, enables the use of the RFO transmitter pins instead of
   /// the PA_BOOST pin (false). Choose the correct setting for your module.
-  void           setTxPower(int8_t power, bool useRFO = false);
+  void           setTxPower(int8_t power);//, bool useRFO = false);
 
   /// Sets the radio into low-power sleep mode.
   /// If successful, the transport will stay in sleep mode until woken by
@@ -748,6 +771,9 @@ private:
   uint8_t				_bw;
   uint8_t				_cr;
   uint8_t				_sf;
+
+  // debug & performance counters
+  struct perf_counter _perf;
 };
 
 /// @example rf95_client.pde
