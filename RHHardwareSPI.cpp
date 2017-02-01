@@ -26,7 +26,7 @@ HardwareSPI SPI(1); // default to chanenl 0
 // http://21stdigitalhome.blogspot.com.au/2013/02/arduino-due-hardware-spi.html
 #if defined (__arm__) && !defined(CORE_TEENSY) && !defined(SPI_CLOCK_DIV16)
  // Arduino Due in 1.5.5 has no definitions for SPI dividers
- // SPI clock divider is based on MCK of 84MHz  
+ // SPI clock divider is based on MCK of 84MHz
  #define SPI_CLOCK_DIV16 (VARIANT_MCK/84000000) // 1MHz
  #define SPI_CLOCK_DIV8  (VARIANT_MCK/42000000) // 2MHz
  #define SPI_CLOCK_DIV4  (VARIANT_MCK/21000000) // 4MHz
@@ -40,26 +40,26 @@ RHHardwareSPI::RHHardwareSPI(Frequency frequency, BitOrder bitOrder, DataMode da
 {
 }
 
-uint8_t RHHardwareSPI::transfer(uint8_t data) 
+uint8_t RHHardwareSPI::transfer(uint8_t data)
 {
     return SPI.transfer(data);
 }
 
-void RHHardwareSPI::attachInterrupt() 
+void RHHardwareSPI::attachInterrupt()
 {
 #if (RH_PLATFORM == RH_PLATFORM_ARDUINO)
     SPI.attachInterrupt();
 #endif
 }
 
-void RHHardwareSPI::detachInterrupt() 
+void RHHardwareSPI::detachInterrupt()
 {
 #if (RH_PLATFORM == RH_PLATFORM_ARDUINO)
     SPI.detachInterrupt();
 #endif
 }
-    
-void RHHardwareSPI::begin() 
+
+void RHHardwareSPI::begin()
 {
     // Sigh: there are no common symbols for some of these SPI options across all platforms
 #if (RH_PLATFORM == RH_PLATFORM_ARDUINO) || (RH_PLATFORM == RH_PLATFORM_UNO32) || (RH_PLATFORM == RH_PLATFORM_CHIPKIT_CORE)
@@ -80,6 +80,7 @@ void RHHardwareSPI::begin()
 #else
  #if (RH_PLATFORM == RH_PLATFORM_ARDUINO) && defined (__arm__) && defined(ARDUINO_ARCH_SAMD)
     // Zero requires begin() before anything else :-)
+
     SPI.begin();
  #endif
 
@@ -135,6 +136,7 @@ void RHHardwareSPI::begin()
 	    break;
 
     }
+
 
     SPI.setClockDivider(divider);
     SPI.begin();
@@ -285,12 +287,12 @@ void RHHardwareSPI::begin()
      // Requires SPI driver for ESP8266 from https://github.com/esp8266/Arduino/tree/master/libraries/SPI
      // Which ppears to be in Arduino Board Manager ESP8266 Community version 2.1.0
      // Contributed by David Skinner
-     // begin comes first 
+     // begin comes first
      SPI.begin();
 
      // datamode
      switch ( _dataMode )
-     { 
+     {
 	 case DataMode1:
 	     SPI.setDataMode ( SPI_MODE1 );
 	     break;
@@ -378,10 +380,9 @@ void RHHardwareSPI::begin()
 #endif
 }
 
-void RHHardwareSPI::end() 
+void RHHardwareSPI::end()
 {
     return SPI.end();
 }
 
 #endif
-

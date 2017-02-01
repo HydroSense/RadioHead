@@ -566,6 +566,7 @@ public:
 
     Bw500Cr48Sf4096NoHeadNoCrc,
     Bw500Cr48Sf4096,
+    Bw500Cr48Sf4096Ldo,
   } ModemConfigChoice;
 
   /// Constructor. You can have multiple instances, but each instance must have its own
@@ -642,6 +643,10 @@ public:
   /// \return true if the message length was valid and it was correctly queued for transmit. Return false
   /// if CAD was requested and the CAD timeout timed out before clear channel was detected.
   virtual bool    send(const uint8_t* data, uint8_t len);
+
+  // writes to the TX fifo and sets RH_RF95_MODE_FSTX
+  // call setModeTx to trigger transmit.
+  virtual bool    writefifo(const uint8_t* data, uint8_t len);
 
   /// Sets the length of the preamble
   /// in bytes.

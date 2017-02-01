@@ -22,8 +22,11 @@ PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
   { 0x92,   0x74,    0x00}, // Bw500Cr45Sf128
   { 0x48,   0x94,    0x00}, // Bw31_25Cr48Sf512
   { 0x78,   0xc4,    0x00}, // Bw125Cr48Sf4096
+
   { 0x99,   0xc0,    0x04}, // Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC
-  { 0x98,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC
+  { 0x98,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC,
+  { 0x98,   0xc4,    0x0c}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE
+
 };
 
 RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi)
@@ -191,7 +194,11 @@ void RH_RF95::handleInterrupt()
     // Remember the RSSI of this packet
     // this is according to the doc, but is it really correct?
     // weakest receiveable signals are reported RSSI at about -66
-    _lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 137;
+    //_lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 137;
+
+    // the semtech datasheet pg 87 has a different value.
+    _lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 157;
+
 
     // We have received a message.
     validateRxBuf();
@@ -309,19 +316,13 @@ void RH_RF95::validateRxBuf()
     return true;
   }
 
-  bool RH_RF95::send(const uint8_t* data, uint8_t len)
-  {
+  bool RH_RF95::writefifo(const uint8_t* data, uint8_t len){
     _perf.send_call = millis();
-
     if (len > RH_RF95_MAX_MESSAGE_LEN)
       return false;
 
-    waitPacketSent(); // Make sure we dont interrupt an outgoing message
+    // must be in standby mode to write to fifo
     setModeIdle();
-
-    if (!waitCAD())
-      return false;  // Check channel activity
-
     // Position at the beginning of the FIFO
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, 0);
 
@@ -342,9 +343,24 @@ void RH_RF95::validateRxBuf()
     _perf.sent_bytes = len;
 #endif
 
-    setModeTx(); // Start the transmitter
-    // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
+    // from RH_RF95_MODE_FSTX, turnaround to TX is faster.
+    spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_FSTX);
     return true;
+  }
+
+  bool RH_RF95::send(const uint8_t* data, uint8_t len)
+  {
+    _perf.send_call = millis();
+
+    waitPacketSent(); // Make sure we dont interrupt an outgoing message
+
+    if (writefifo(data, len)){
+      setModeTx(); // Start the transmitter
+      // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
+      return true;
+    }else{
+      return false;
+    }
   }
 
   bool RH_RF95::printRegisters()
@@ -379,12 +395,11 @@ void RH_RF95::validateRxBuf()
 
     return true;
   }
-
   void RH_RF95::setModeIdle()
   {
     if (_mode != RHModeIdle)
     {
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_STDBY);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_STDBY);
       _mode = RHModeIdle;
     }
   }
@@ -393,7 +408,7 @@ void RH_RF95::validateRxBuf()
   {
     if (_mode != RHModeSleep)
     {
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_SLEEP);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_SLEEP);
       _mode = RHModeSleep;
     }
     return true;
@@ -401,7 +416,7 @@ void RH_RF95::validateRxBuf()
   void RH_RF95::setModeCAD(){
     if (_mode != RHModeCad)
     {
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_CAD);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_CAD);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x80); // Interrupt on CadDone (same as CadDetected)
       _mode = RHModeCad;
     }
@@ -410,7 +425,7 @@ void RH_RF95::validateRxBuf()
   {
     if (_mode != RHModeRx)
     {
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_RXCONTINUOUS);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_RXCONTINUOUS);
       //spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_RXSINGLE);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x00); // Interrupt on RxDone
 
@@ -424,7 +439,7 @@ void RH_RF95::validateRxBuf()
     if (_mode != RHModeTx)
     {
       _perf.tx_mode = millis();
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_TX);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_TX);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x40); // Interrupt on TxDone
       _mode = RHModeTx;
     }
@@ -522,7 +537,7 @@ void RH_RF95::validateRxBuf()
     // Set mode RHModeCad
     if (_mode != RHModeCad)
     {
-      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_CAD);
+      spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_CAD);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x80); // Interrupt on CadDone
       _mode = RHModeCad;
     }
