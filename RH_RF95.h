@@ -567,6 +567,7 @@ public:
     Bw500Cr48Sf4096NoHeadNoCrc,
     Bw500Cr48Sf4096,
     Bw500Cr48Sf4096Ldo,
+    Bw500Cr48Sf4096NoCrc,
   } ModemConfigChoice;
 
   /// Constructor. You can have multiple instances, but each instance must have its own
