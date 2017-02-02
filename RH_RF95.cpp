@@ -29,11 +29,13 @@ PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
 
 };
 
-RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin, RHGenericSPI& spi)
+RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin,
+  RHGenericSPI& spi, void (*rxCallback)(void))
 :
 RHSPIDriver(slaveSelectPin, spi),
 _rxBufValid(0)
 {
+  _rxCallback = rxCallback;
   _interruptPin = interruptPin;
   _myInterruptIndex = 0xff; // Not allocated yet
 }
@@ -181,6 +183,8 @@ void RH_RF95::handleInterrupt()
   {
     _perf.rx_done= millis();
 
+
+
     // Have received a packet
     uint8_t len = spiRead(RH_RF95_REG_13_RX_NB_BYTES);
 
@@ -202,8 +206,17 @@ void RH_RF95::handleInterrupt()
 
     // We have received a message.
     validateRxBuf();
-    if (_rxBufValid)
-      setModeIdle(); // Got one
+
+    // stay in RX mode to get the next packet.
+    //if (_rxBufValid)
+    //  setModeIdle(); // Got one
+
+    // make callback if requested, BEFORE actually reading the packet
+    // this is to allow the user to set the next mode immediately
+    // if another packet is expected.
+    if (_rxCallback != NULL){
+      _rxCallback();
+    }
   }
   else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
   {
@@ -522,7 +535,9 @@ void RH_RF95::validateRxBuf()
 
     return true;
   }
-
+  void RH_RF95::setPayloadLength(uint8_t len) {
+    spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len);
+  }
   void RH_RF95::setPreambleLength(uint16_t bytes)
   {
     //the radio adds 4 symbols, the minimum is 6+4 = 10 symbols in LoRa mode

@@ -588,7 +588,8 @@ public:
   /// On other boards, any digital pin may be used.
   /// \param[in] spi Pointer to the SPI interface object to use.
   ///                Defaults to the standard Arduino hardware SPI interface
-  RH_RF95(uint8_t slaveSelectPin = SS, uint8_t interruptPin = 2, RHGenericSPI& spi = hardware_spi);
+  RH_RF95(uint8_t slaveSelectPin = SS, uint8_t interruptPin = 2,
+      RHGenericSPI& spi = hardware_spi, void (*rxCallback)(void) = NULL);
 
   /// Initialise the Driver transport hardware and software.
   /// Make sure the Driver is properly configured before calling init().
@@ -647,6 +648,9 @@ public:
   // writes to the TX fifo and sets RH_RF95_MODE_FSTX
   // call setModeTx to trigger transmit.
   virtual bool    writefifo(const uint8_t* data, uint8_t len);
+
+  // Sets the payloadlength modem register for implicit header mode
+  void            setPayloadLength(uint8_t len);
 
   /// Sets the length of the preamble
   /// in bytes.
@@ -771,6 +775,9 @@ private:
 
   /// True when there is a valid message in the buffer
   volatile bool       _rxBufValid;
+
+  // function pointer called on RX
+  void                (*_rxCallback)(void);
 
   uint32_t			_freq;
   uint8_t				_bw;
