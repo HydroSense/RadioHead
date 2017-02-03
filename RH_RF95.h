@@ -28,7 +28,7 @@
 //#define RH_RF95_SEND_RH_HEADER
 // The length of the headers we add.
 // The headers are inside the LORA's payload
-#define RH_RF95_HEADER_LEN 4
+#define RH_RF95_HEADER_LEN 0
 
 // This is the maximum message length that can be supported by this driver.
 // Can be pre-defined to a smaller size (to save SRAM) prior to including this header
