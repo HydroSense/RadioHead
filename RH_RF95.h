@@ -634,6 +634,8 @@ public:
   /// \return true if a valid message was copied to buf
   virtual bool    recv(uint8_t* buf, uint8_t* len);
 
+
+  uint32_t      getTimeOnAir(uint8_t pktlen);
   /// Waits until any previous transmit packet is finished being transmitted with waitPacketSent().
   /// Then optionally waits for Channel Activity Detection (CAD)
   /// to show the channnel is clear (if the radio supports CAD) by calling waitCAD().
@@ -781,9 +783,13 @@ private:
   void                (*_rxCallback)(void);
 
   uint32_t			_freq;
+  uint16_t      _preamblelen;
   uint8_t				_bw;
   uint8_t				_cr;
   uint8_t				_sf;
+  uint8_t       _payloadCrc;
+  uint8_t       _fixedLen;    // aka implicit header if 1
+  uint8_t       _lowDR;
 
   // debug & performance counters
   struct perf_counter _perf;

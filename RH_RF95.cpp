@@ -138,7 +138,7 @@ bool RH_RF95::init()
   // No Sync Words in LORA mode.
   setModemConfig(Bw125Cr45Sf128); // Radio default
   //    setModemConfig(Bw125Cr48Sf4096); // slow and reliable?
-  //setPreambleLength(8); // Default is 8
+  setPreambleLength(8); // Default is 8
   // An innocuous ISM frequency, same as RF22's
   // leave radio at default frequency
   // setFrequency(434.0);
@@ -328,7 +328,74 @@ void RH_RF95::validateRxBuf()
     clearRxBuf(); // This message accepted and cleared
     return true;
   }
+  uint32_t RH_RF95::getTimeOnAir(uint8_t pktLen){
+    //from SEMTECH Firmware Driver and LoRaWAN Stack V4.1.0
 
+    uint32_t airTime = 0;
+    double bw = 0.0;
+     // REMARK: When using LoRa modem only bandwidths 125, 250 and 500 kHz are supported
+     switch( _bw )
+     {
+     case 7: // 125 kHz
+         bw = 125;
+         break;
+     case 8: // 250 kHz
+         bw = 250;
+         break;
+     case 9: // 500 kHz
+         bw = 500;
+         break;
+     }
+
+          //
+          // Serial.println("-------------------");
+          // Serial.print("pktLen: ");
+          // Serial.println(pktLen);
+          //
+          // Serial.print("bw: ");
+          // Serial.println(bw);
+
+
+     // Symbol rate : time for one symbol (secs)
+     double rs = bw / ( 1 << _sf );
+     double ts = 1 / rs;
+    //  Serial.println(_sf);
+    //  Serial.println(rs);
+    //  Serial.println(ts);
+     //
+
+     // time of preamble
+     double tPreamble = ( _preamblelen + 4.25 ) * ts;
+    //  Serial.print("Tpre: ");
+    //  Serial.println(tPreamble);
+    //  Serial.print("lowDR: ");
+    //  Serial.println(_lowDR);
+    //  Serial.print("cr: ");
+    //  Serial.println(_cr);
+    //  Serial.print("paylodCrc: ");
+    //  Serial.println(_payloadCrc);
+    //  Serial.print("fixedLen: ");
+    //  Serial.println(_fixedLen);
+     // Symbol length of payload and time
+     double tmp = ceil( ( 8 * pktLen - 4 * _sf + 28 + 16 * _payloadCrc -
+                          ( _fixedLen ? 20 : 0 ) ) /
+                          ( double )( 4 * ( _sf - ( ( _lowDR > 0 ) ? 2 : 0 ) ) )
+                        ) * ( _cr + 4 );
+     double nPayload = 8 + ( ( tmp > 0 ) ? tmp : 0 );
+     double tPayload = nPayload * ts;
+    //  Serial.print("nPay: ");
+    //  Serial.println(nPayload);
+    //
+    //  Serial.print("Tpay: ");
+    //  Serial.println(tPayload);
+     // Time on air
+     double tOnAir = tPreamble + tPayload;
+     // return us secs
+     airTime = floor( tOnAir + 0.999 );
+
+          // Serial.println("-------------------");
+     return airTime;
+  }
   bool RH_RF95::writefifo(const uint8_t* data, uint8_t len){
     _perf.send_call = millis();
     if (len > RH_RF95_MAX_MESSAGE_LEN)
@@ -482,13 +549,15 @@ void RH_RF95::validateRxBuf()
       // For RH_RF95_PA_DAC_ENABLE, manual says '+20dBm on PA_BOOST when OutputPower=0xf'
       // RH_RF95_PA_DAC_ENABLE actually adds about 3dBm to all power levels. We will us it
       // for 21, 22 and 23dBm
-      if (power > 20)
+      // the Semtech drivers turn this on above 17 db
+      // http://www.semtech.com/apps/filedown/down.php?file=LoRaMac-node-master.zip
+      if (power > 17)
       {
         spiWrite(RH_RF95_REG_4D_PA_DAC, RH_RF95_PA_DAC_RESERVED | RH_RF95_PA_DAC_ENABLE);
         power -= 3;
 
-        //turn up OCP to 120mA
-        spiWrite(RH_RF95_REG_0B_OCP, RH_RF95_OCP_ON | 15);
+        //turn up OCP to 130mA (semtech data sheet says current could be up to 125mA)
+        spiWrite(RH_RF95_REG_0B_OCP, RH_RF95_OCP_ON | 16);
       }
       else
       {
@@ -515,8 +584,11 @@ void RH_RF95::validateRxBuf()
   void RH_RF95::setModemRegisters(const ModemConfig* config)
   {
     _bw = config->reg_1d >> 4;
-    _cr = (config->reg_1d & 0x0d) >> 1;
+    _cr = (config->reg_1d >> 1) & 0x7;
     _sf = (config->reg_1e) >> 4;
+    _payloadCrc = 0x1 & (config->reg_1e >> 2);
+    _fixedLen = 0x1 & config->reg_1d;
+    _lowDR = 0x1 & (config->reg_26 >> 3);
     spiWrite(RH_RF95_REG_1D_MODEM_CONFIG1,       config->reg_1d);
     spiWrite(RH_RF95_REG_1E_MODEM_CONFIG2,       config->reg_1e);
     spiWrite(RH_RF95_REG_26_MODEM_CONFIG3,       config->reg_26);
@@ -545,6 +617,7 @@ void RH_RF95::validateRxBuf()
       bytes = 6;
     spiWrite(RH_RF95_REG_20_PREAMBLE_MSB, bytes >> 8);
     spiWrite(RH_RF95_REG_21_PREAMBLE_LSB, bytes & 0xff);
+    _preamblelen = bytes;
   }
 
   bool RH_RF95::isChannelActive()
