@@ -615,6 +615,13 @@ public:
   /// \return true if index is a valid choice.
   bool        setModemConfig(ModemConfigChoice index);
 
+  /// Set the modem configuration using sf and cr. The frequency is fixed to 500khz
+  /// \param[in] sf The spread factor
+  /// \param[in] cr The coding rate
+  void setEncoding(int sf, int cr);
+
+  void setEncoding(int sf, int cr, bool crc);
+
   /// Tests whether a new message is available
   /// from the Driver.
   /// On most drivers, this will also put the Driver into RHModeRx mode until
