@@ -607,6 +607,24 @@ void RH_RF95::validateRxBuf()
 
     return true;
   }
+
+  void RH_RF95::setEncoding(int sf, int cr){
+    RH_RF95::setEncoding(sf, cr, true);
+  }
+
+  void RH_RF95::setEncoding(int sf, int cr, bool crc){
+    sf &= 0xF;
+    cr &= 0x7; // remove all the uncessary bits
+    ModemConfig cfg;
+    // set the cfg
+    cfg.reg_1d = 0x90 | (cr << 1);
+    cfg.reg_1e = crc?( (sf << 4) | 0x04) : (sf << 4);
+    cfg.reg_26 = 0x04;
+    memcpy_P(&cfg, &cfg, sizeof(RH_RF95::ModemConfig));
+    setModemRegisters(&cfg);
+ 
+  }
+
   void RH_RF95::setPayloadLength(uint8_t len) {
     spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len);
   }
