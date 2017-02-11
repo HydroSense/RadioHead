@@ -30,6 +30,9 @@
 // The headers are inside the LORA's payload
 #define RH_RF95_HEADER_LEN 0
 
+// the number of FHSS channels in the FHSS_CHANNEL_TABLE
+#define RH_RF95_FHSS_CHANNELS 25
+
 // This is the maximum message length that can be supported by this driver.
 // Can be pre-defined to a smaller size (to save SRAM) prior to including this header
 // Here we allow for 1 byte message length, 4 bytes headers, user data and 2 bytes of FCS
@@ -84,6 +87,12 @@
 #define RH_RF95_REG_24_HOP_PERIOD                          0x24
 #define RH_RF95_REG_25_FIFO_RX_BYTE_ADDR                   0x25
 #define RH_RF95_REG_26_MODEM_CONFIG3                       0x26
+
+#define RH_RF95_REG_2F_RESERVED                           0x2f
+#define RH_RF95_REG_30_RESERVED                           0x30
+#define RH_RF95_REG_31_RESERVED                           0x31
+#define RH_RF95_REG_36_RESERVED                           0x36
+#define RH_RF95_REG_3a_RESERVED                           0x3a
 
 #define RH_RF95_REG_40_DIO_MAPPING1                        0x40
 #define RH_RF95_REG_41_DIO_MAPPING2                        0x41
@@ -590,6 +599,7 @@ public:
   /// \param[in] spi Pointer to the SPI interface object to use.
   ///                Defaults to the standard Arduino hardware SPI interface
   RH_RF95(uint8_t slaveSelectPin = SS, uint8_t interruptPin = 2,
+      uint8_t fhssInterruptPin = 5,
       RHGenericSPI& spi = hardware_spi, void (*rxCallback)(void) = NULL);
 
   /// Initialise the Driver transport hardware and software.
@@ -641,6 +651,18 @@ public:
   /// \return true if a valid message was copied to buf
   virtual bool    recv(uint8_t* buf, uint8_t* len);
 
+  // sets the hopping period, 1st hop is always after the
+  // preamble + header, ie the payload is always on channel 1
+  // set to 0 to disable FHSS [default]
+  // the actual hopping period is Symbol Time (Ts) * i
+  bool          setFhssHoppingPeriod(uint8_t i);
+
+  // after configuring the modem, this can be used to
+  // set the FhssHoppingPeriod from the computed symbol time.
+  // the dwell time on the channel is <= dwellTime
+  // if the modem SF changes, the FhssHoppingPeriod needs to be
+  // updated as well.
+  uint16_t          configureFhss(uint16_t dwellTime);
 
   uint32_t      getTimeOnAir(uint8_t pktlen);
   /// Waits until any previous transmit packet is finished being transmitted with waitPacketSent().
@@ -684,6 +706,10 @@ public:
 
   // returns performance counter struct
   struct perf_counter*  getPerf(){return &_perf;}
+
+  // sets the frequency currently requested by the radio in RH_RF95_FHSS_PRESENT_CHANNEL
+  // in FHSS mode, this will be called bt the FhssInterrupt handler
+  bool        setFhssChannel();
 
   /// Sets the transmitter and receiver
   /// centre frequency.
@@ -747,6 +773,7 @@ protected:
   /// Called automatically by isr*()
   /// Should not need to be called by user code.
   void           handleInterrupt();
+  void           handleFhssInterrupt();
 
   /// Examine the revceive buffer to determine whether the message is for this node
   void validateRxBuf();
@@ -764,6 +791,10 @@ private:
   /// Low level interrupt service routine for device connected to interrupt 1
   static void         isr2();
 
+  static void         fhss_isr0();
+  static void         fhss_isr1();
+  static void         fhss_isr2();
+
   /// Array of instances connected to interrupts 0 and 1
   static RH_RF95*     _deviceForInterrupt[];
 
@@ -772,6 +803,8 @@ private:
 
   /// The configured interrupt pin connected to this instance
   uint8_t             _interruptPin;
+
+  uint8_t             _fhssInterruptPin;
 
   /// The index into _deviceForInterrupt[] for this device (if an interrupt is already allocated)
   /// else 0xff
@@ -788,6 +821,9 @@ private:
 
   // function pointer called on RX
   void                (*_rxCallback)(void);
+
+  uint8_t       _chipver;
+  uint8_t       _useFhss;
 
   uint32_t			_freq;
   uint16_t      _preamblelen;

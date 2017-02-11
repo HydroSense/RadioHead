@@ -29,7 +29,23 @@ PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
   { 0x98,   0xc0,    0x04}, // Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC,
 };
 
+/* MHz
+902.2746582 903.3239746 904.373291 905.4226074 906.4719238
+907.5212402 908.5705566 909.619873 910.6691895 911.7185059
+912.7678223 913.8171387 914.8664551 915.9157715 916.9650879
+918.0144043 919.0637207 920.1130371 921.1623535 922.2116699
+923.2609863 924.3103027 925.3596191 926.4089355 927.458252
+*/
+PROGMEM static const uint32_t FHSS_CHANNEL_TABLE[] =
+{
+  14782868, 14800060, 14817252, 14834444, 14851636,
+  14868828, 14886020, 14903212, 14920404, 14937596,
+  14954788, 14971980, 14989172, 15006364, 15023556,
+  15040748, 15057940, 15075132, 15092324, 15109516,
+  15126708, 15143900, 15161092, 15178284, 15195476
+};
 RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin,
+  uint8_t fhssInterruptPin,
   RHGenericSPI& spi, void (*rxCallback)(void))
 :
 RHSPIDriver(slaveSelectPin, spi),
@@ -37,7 +53,9 @@ _rxBufValid(0)
 {
   _rxCallback = rxCallback;
   _interruptPin = interruptPin;
+  _fhssInterruptPin = fhssInterruptPin,
   _myInterruptIndex = 0xff; // Not allocated yet
+  _useFhss = 0;
 }
 
 bool RH_RF95::init()
@@ -77,6 +95,11 @@ bool RH_RF95::init()
     return false; // No device present?
   }
 
+  _chipver = spiRead(RH_RF95_REG_42_VERSION);
+
+  // Serial.print("CHIPVER: ");
+  // Serial.println(chipver);
+
   _perf.interrupt_count = 0;
   _perf.rx_timeout = 0;
   _perf.rx_crc_err = 0;
@@ -85,6 +108,7 @@ bool RH_RF95::init()
   // ARM M4 requires the below. else pin interrupt doesn't work properly.
   // On all other platforms, its innocuous, belt and braces
   pinMode(_interruptPin, INPUT);
+  pinMode(_fhssInterruptPin, INPUT);
 
   // Set up interrupt handler
   // Since there are a limited number of interrupt glue functions isr*() available,
@@ -103,13 +127,16 @@ bool RH_RF95::init()
     }
   }
   _deviceForInterrupt[_myInterruptIndex] = this;
-  if (_myInterruptIndex == 0)
+  if (_myInterruptIndex == 0){
     attachInterrupt(interruptNumber, isr0, RISING);
-  else if (_myInterruptIndex == 1)
+    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr0, RISING);
+  } else if (_myInterruptIndex == 1) {
     attachInterrupt(interruptNumber, isr1, RISING);
-  else if (_myInterruptIndex == 2)
+    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr1, RISING);
+  } else if (_myInterruptIndex == 2) {
     attachInterrupt(interruptNumber, isr2, RISING);
-  else
+    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr2, RISING);
+  } else
     return false; // Too many devices, not enough interrupt vectors
 
   // added by AMM, if the radio has a pending interrupt, we must clear it now
@@ -151,6 +178,19 @@ bool RH_RF95::init()
   return true;
 }
 
+// for FHSS, see 4.1.1.8 in the manual.
+// read RhssPresentChannel to get the requested channel
+// program the new channel and clear the ChangeChanelFhss by writing a 1
+void RH_RF95::handleFhssInterrupt()
+{
+
+
+  setFhssChannel();
+
+  // clear the RH_RF95_FHSS_CHANGE_CHANNEL interrupt
+  spiWrite(RH_RF95_REG_12_IRQ_FLAGS, RH_RF95_FHSS_CHANGE_CHANNEL);
+
+}
 // C++ level interrupt handler for this instance
 // LORA is unusual in that it has several interrupt lines, and not a single, combined one.
 // On MiniWirelessLoRa, only one of the several interrupt lines (DI0) from the RFM95 is usefuly
@@ -238,7 +278,14 @@ void RH_RF95::handleInterrupt()
     }
   }
 
-  spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
+  // don't clear FhssChangeChannel
+  //spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
+
+  // Clear all IRQ flags, except RH_RF95_FHSS_CHANGE_CHANNEL
+  spiWrite(RH_RF95_REG_12_IRQ_FLAGS, RH_RF95_RX_TIMEOUT |
+      RH_RF95_RX_DONE | RH_RF95_PAYLOAD_CRC_ERROR | RH_RF95_VALID_HEADER |
+      RH_RF95_TX_DONE | RH_RF95_CAD_DONE | RH_RF95_CAD_DETECTED);
+
 }
 
 // These are low level functions that call the interrupt handler for the correct
@@ -259,7 +306,21 @@ void RH_RF95::isr2()
   if (_deviceForInterrupt[2])
   _deviceForInterrupt[2]->handleInterrupt();
 }
-
+void RH_RF95::fhss_isr0()
+{
+  if (_deviceForInterrupt[0])
+  _deviceForInterrupt[0]->handleFhssInterrupt();
+}
+void RH_RF95::fhss_isr1()
+{
+  if (_deviceForInterrupt[1])
+  _deviceForInterrupt[1]->handleFhssInterrupt();
+}
+void RH_RF95::fhss_isr2()
+{
+  if (_deviceForInterrupt[2])
+  _deviceForInterrupt[2]->handleFhssInterrupt();
+}
 // Check whether the latest received message is complete and uncorrupted
 void RH_RF95::validateRxBuf()
 {
@@ -328,6 +389,47 @@ void RH_RF95::validateRxBuf()
     clearRxBuf(); // This message accepted and cleared
     return true;
   }
+
+  bool    RH_RF95::setFhssHoppingPeriod(uint8_t i){
+    _useFhss = i > 0;
+    spiWrite(RH_RF95_REG_24_HOP_PERIOD, i);
+    return true;
+  }
+
+  uint16_t RH_RF95::configureFhss(uint16_t dwell){
+    double bw = 0.0;
+     // REMARK: When using LoRa modem only bandwidths 125, 250 and 500 kHz are supported
+     switch( _bw )
+     {
+     case 7: // 125 kHz
+         bw = 125;
+         break;
+     case 8: // 250 kHz
+         bw = 250;
+         break;
+     case 9: // 500 kHz
+         bw = 500;
+         break;
+     }
+     // Symbol rate : time for one symbol (secs)
+     double rs = bw / ( 1 << _sf );
+     double ts = 1 / rs;
+
+     uint32_t hp = floor(dwell / ts);
+
+     // at high rates (small ts), we cannot get long dwell times due to the
+     // 8 bit reg, so saturate.
+     if (hp > 0xff)
+      hp = 0xff;
+     setFhssHoppingPeriod(hp);
+    //  Serial.println("-------------------");
+    //  Serial.println(ts);
+    //  Serial.print("Fhss actual dwell time: ");
+    //  Serial.print((int)(hp * ts));
+    //  Serial.println("-------------------");
+     return (uint16_t)(hp * ts);
+  }
+
   uint32_t RH_RF95::getTimeOnAir(uint8_t pktLen){
     //from SEMTECH Firmware Driver and LoRaWAN Stack V4.1.0
 
@@ -464,6 +566,21 @@ void RH_RF95::validateRxBuf()
     return RH_RF95_MAX_MESSAGE_LEN;
   }
 
+  bool RH_RF95::setFhssChannel()
+  {
+    // this is the channel the radio is requesting
+    uint8_t i = spiRead(RH_RF95_REG_1C_HOP_CHANNEL) & RH_RF95_FHSS_PRESENT_CHANNEL;
+
+    uint32_t frf = FHSS_CHANNEL_TABLE[i % RH_RF95_FHSS_CHANNELS];
+    _freq = frf;
+    spiWrite(RH_RF95_REG_06_FRF_MSB, (frf >> 16) & 0xff);
+    spiWrite(RH_RF95_REG_07_FRF_MID, (frf >> 8) & 0xff);
+    spiWrite(RH_RF95_REG_08_FRF_LSB, frf & 0xff);
+
+    // Serial.print("====FHSS ch is now ");
+    // Serial.print(i % RH_RF95_FHSS_CHANNELS);
+    // Serial.println("====");
+  }
   bool RH_RF95::setFrequency(float centre)
   {
     // Frf = FRF / FSTEP
@@ -505,6 +622,9 @@ void RH_RF95::validateRxBuf()
   {
     if (_mode != RHModeRx)
     {
+      if (_useFhss)
+        setFhssChannel();
+
       spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_RXCONTINUOUS);
       //spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_MODE_RXSINGLE);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x00); // Interrupt on RxDone
@@ -519,6 +639,10 @@ void RH_RF95::validateRxBuf()
     if (_mode != RHModeTx)
     {
       _perf.tx_mode = millis();
+
+      if (_useFhss)
+        setFhssChannel();
+
       spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_TX);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x40); // Interrupt on TxDone
       _mode = RHModeTx;
@@ -583,6 +707,8 @@ void RH_RF95::validateRxBuf()
   // Sets registers from a canned modem configuration structure
   void RH_RF95::setModemRegisters(const ModemConfig* config)
   {
+    setModeIdle(); // standby radio mode before reconfiguring radio
+
     _bw = config->reg_1d >> 4;
     _cr = (config->reg_1d >> 1) & 0x7;
     _sf = (config->reg_1e) >> 4;
@@ -592,6 +718,25 @@ void RH_RF95::validateRxBuf()
     spiWrite(RH_RF95_REG_1D_MODEM_CONFIG1,       config->reg_1d);
     spiWrite(RH_RF95_REG_1E_MODEM_CONFIG2,       config->reg_1e);
     spiWrite(RH_RF95_REG_26_MODEM_CONFIG3,       config->reg_26);
+
+    if (_chipver == 0x12){
+      // errata http://www.semtech.com/images/datasheet/SX1276_77_8_ErrataNote_1_1.pdf
+
+      // 2.1 and 2.3, assume 900 MHz operation.
+      if (_bw == 9){ // 500 KHz
+        spiWrite(RH_RF95_REG_36_RESERVED, 0x02);
+        spiWrite(RH_RF95_REG_3a_RESERVED, 0x64);
+        spiWrite(RH_RF95_REG_31_RESERVED, 0x80 | spiRead(RH_RF95_REG_31_RESERVED));
+
+      }else{  // not 500 KHz
+        spiWrite(RH_RF95_REG_36_RESERVED, 0x03);
+        spiWrite(RH_RF95_REG_3a_RESERVED, 0x65);
+        spiWrite(RH_RF95_REG_31_RESERVED, 0x7F & spiRead(RH_RF95_REG_31_RESERVED));
+        spiWrite(RH_RF95_REG_2F_RESERVED, 0x40);
+        spiWrite(RH_RF95_REG_30_RESERVED, 0x00);
+      }
+    }
+
   }
 
   // Set one of the canned FSK Modem configs
@@ -599,7 +744,7 @@ void RH_RF95::validateRxBuf()
   bool RH_RF95::setModemConfig(ModemConfigChoice index)
   {
     if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig)))
-    return false;
+      return false;
 
     ModemConfig cfg;
     memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RH_RF95::ModemConfig));
@@ -622,7 +767,7 @@ void RH_RF95::validateRxBuf()
     cfg.reg_26 = 0x04;
     memcpy_P(&cfg, &cfg, sizeof(RH_RF95::ModemConfig));
     setModemRegisters(&cfg);
- 
+
   }
 
   void RH_RF95::setPayloadLength(uint8_t len) {
