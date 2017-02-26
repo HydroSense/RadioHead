@@ -757,11 +757,9 @@
 #endif
 
 // this is a hack for library loading sequence
-#ifdef __arm__
+#if defined(__arm__) && !defined(RH_PLATFORM_ARDUINO)
 #define RH_PLATFORM RH_PLATFORM_RASPI
 #endif
-
-#warning using platform #RH_PLATFORM
 
 #if defined(__AVR_ATtiny84__) || defined(__AVR_ATtiny85__) || defined(__AVR_ATtiny24__) || defined(__AVR_ATtiny44__) || defined(__AVR_ATtiny45__) || defined(__AVR_ATtinyX4__) || defined(__AVR_ATtinyX5__) || defined(__AVR_ATtiny2313__) || defined(__AVR_ATtiny4313__) || defined(__AVR_ATtinyX313__)
  #define RH_PLATFORM_ATTINY
