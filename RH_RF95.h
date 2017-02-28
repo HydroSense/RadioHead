@@ -12,6 +12,7 @@
 #ifndef RH_RF95_h
 #define RH_RF95_h
 
+#include <math.h>
 #include <RHSPIDriver.h>
 
 // This is the maximum number of interrupts the driver can support
@@ -575,6 +576,7 @@ public:
 
     Bw500Cr48Sf4096NoHeadNoCrc,
     Bw500Cr48Sf4096,
+    Bw500Cr45Sf4096,
     Bw500Cr48Sf4096Ldo,
     Bw500Cr48Sf4096NoCrc,
   } ModemConfigChoice;

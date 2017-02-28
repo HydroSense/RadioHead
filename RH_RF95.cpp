@@ -25,6 +25,7 @@ PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
 
   { 0x99,   0xc0,    0x04}, // Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC
   { 0x98,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC,
+  { 0x92,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5
   { 0x98,   0xc4,    0x0c}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE
   { 0x98,   0xc0,    0x04}, // Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC,
 };
