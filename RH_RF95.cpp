@@ -747,6 +747,12 @@ void RH_RF95::validateRxBuf()
     if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig)))
       return false;
 
+    // if it's the same radio modem config, don't change anything
+    if(index == this->_current_modem_config)
+        return true;
+    else
+        this->_current_modem_config = index;
+
     ModemConfig cfg;
     memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RH_RF95::ModemConfig));
     setModemRegisters(&cfg);

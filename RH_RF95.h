@@ -652,6 +652,8 @@ public:
   /// \param[in,out] len Pointer to available space in buf. Set to the actual number of octets copied.
   /// \return true if a valid message was copied to buf
   virtual bool    recv(uint8_t* buf, uint8_t* len);
+    
+  //virtual uint8_t recv(uint8_t* buf);
 
   // sets the hopping period, 1st hop is always after the
   // preamble + header, ie the payload is always on channel 1
@@ -838,6 +840,9 @@ private:
 
   // debug & performance counters
   struct perf_counter _perf;
+
+  // current radio modem config
+  ModemConfigChoice _current_modem_config; 
 };
 
 /// @example rf95_client.pde
