@@ -6,7 +6,6 @@
 #include <RH_RF95.h>
 
 
-
 // Interrupt vectors for the 3 Arduino interrupt pins
 // Each interrupt can be handled by a different instance of RH_RF95, allowing you to have
 // 2 or more LORAs per Arduino
@@ -45,16 +44,19 @@ PROGMEM static const uint32_t FHSS_CHANNEL_TABLE[] =
   15040748, 15057940, 15075132, 15092324, 15109516,
   15126708, 15143900, 15161092, 15178284, 15195476
 };
-RH_RF95::RH_RF95(uint8_t slaveSelectPin, uint8_t interruptPin,
-  uint8_t fhssInterruptPin,
-  RHGenericSPI& spi, void (*rxCallback)(void))
-:
-RHSPIDriver(slaveSelectPin, spi),
-_rxBufValid(0)
+
+
+
+extern void mprint(const char *format, ...);
+
+RH_RF95::RH_RF95(struct pin_config pc,
+  RHGenericSPI& spi,
+  void (*rxCallback)(void))
+: RHSPIDriver(pc.cs, spi),
+  _pins(pc),
+  _rxBufValid(0)
 {
   _rxCallback = rxCallback;
-  _interruptPin = interruptPin;
-  _fhssInterruptPin = fhssInterruptPin,
   _myInterruptIndex = 0xff; // Not allocated yet
   _useFhss = 0;
 }
@@ -67,7 +69,7 @@ bool RH_RF95::init()
   }
 
   // Determine the interrupt number that corresponds to the interruptPin
-  int interruptNumber = digitalPinToInterrupt(_interruptPin);
+  int interruptNumber = digitalPinToInterrupt(_pins.interrupt);
 
   //printf("digitalPinToInterrupt(%d)==%d\n", _interruptPin, interruptNumber);
   if (interruptNumber == NOT_AN_INTERRUPT){
@@ -108,8 +110,9 @@ bool RH_RF95::init()
   // Add by Adrien van den Bossche <vandenbo@univ-tlse2.fr> for Teensy
   // ARM M4 requires the below. else pin interrupt doesn't work properly.
   // On all other platforms, its innocuous, belt and braces
-  pinMode(_interruptPin, INPUT);
-  pinMode(_fhssInterruptPin, INPUT);
+  pinMode(_pins.interrupt, INPUT);
+  if (_pins.fhss_interrupt >= 0)
+    pinMode(_pins.fhss_interrupt, INPUT);
 
   // Set up interrupt handler
   // Since there are a limited number of interrupt glue functions isr*() available,
@@ -130,18 +133,21 @@ bool RH_RF95::init()
   _deviceForInterrupt[_myInterruptIndex] = this;
   if (_myInterruptIndex == 0){
     attachInterrupt(interruptNumber, isr0, RISING);
-    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr0, RISING);
+    if (_pins.fhss_interrupt >= 0)
+      attachInterrupt(digitalPinToInterrupt(_pins.fhss_interrupt), fhss_isr0, RISING);
   } else if (_myInterruptIndex == 1) {
     attachInterrupt(interruptNumber, isr1, RISING);
-    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr1, RISING);
+    if (_pins.fhss_interrupt >= 0)
+      attachInterrupt(digitalPinToInterrupt(_pins.fhss_interrupt), fhss_isr1, RISING);
   } else if (_myInterruptIndex == 2) {
     attachInterrupt(interruptNumber, isr2, RISING);
-    attachInterrupt(digitalPinToInterrupt(_fhssInterruptPin), fhss_isr2, RISING);
+    if (_pins.fhss_interrupt >= 0)
+      attachInterrupt(digitalPinToInterrupt(_pins.fhss_interrupt), fhss_isr2, RISING);
   } else
     return false; // Too many devices, not enough interrupt vectors
 
   // added by AMM, if the radio has a pending interrupt, we must clear it now
-  uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
+  //uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
   // if (irq_flags > 0){
   //   printf("irq_flags: 0x%02x\n", irq_flags);
   // }
@@ -225,6 +231,9 @@ void RH_RF95::handleInterrupt()
     _perf.rx_done= millis();
 
 
+    if (_pins.rx_led >=0 ){
+      digitalWrite(_pins.rx_led, HIGH);
+    }
 
     // Have received a packet
     uint8_t len = spiRead(RH_RF95_REG_13_RX_NB_BYTES);
@@ -258,9 +267,18 @@ void RH_RF95::handleInterrupt()
     if (_rxCallback != NULL){
       _rxCallback();
     }
+
+    if (_pins.rx_led >=0 ){
+      digitalWrite(_pins.rx_led, LOW);
+    }
   }
   else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
   {
+    if (_pins.tx_led >=0 ){
+
+      digitalWrite(_pins.tx_led, LOW);
+    }
+
     _txGood++;
     setModeIdle();
   }
@@ -538,6 +556,10 @@ void RH_RF95::validateRxBuf()
     waitPacketSent(); // Make sure we dont interrupt an outgoing message
 
     if (writefifo(data, len)){
+      if (_pins.tx_led >=0 ){
+
+        digitalWrite(_pins.tx_led, HIGH);
+      }
       setModeTx(); // Start the transmitter
       // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
       return true;
@@ -581,6 +603,7 @@ void RH_RF95::validateRxBuf()
     // Serial.print("====FHSS ch is now ");
     // Serial.print(i % RH_RF95_FHSS_CHANNELS);
     // Serial.println("====");
+    return true;
   }
   bool RH_RF95::setFrequency(float centre)
   {

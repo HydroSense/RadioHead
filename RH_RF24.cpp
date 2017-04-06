@@ -13,13 +13,13 @@
 RH_RF24* RH_RF24::_deviceForInterrupt[RH_RF24_NUM_INTERRUPTS] = {0, 0, 0};
 uint8_t RH_RF24::_interruptCount = 0; // Index into _deviceForInterrupt for next device
 
-// This configuration data is defined in radio_config_Si4460.h 
+// This configuration data is defined in radio_config_Si4460.h
 // which was generated with the Silicon Labs WDS program
 PROGMEM const uint8_t RFM26_CONFIGURATION_DATA[] = RADIO_CONFIGURATION_DATA_ARRAY;
 
 // These configurations were all generated originally by the Silicon LAbs WDS configuration tool, configured with
-// a 30MHz XO. 
-// The configurations were imported into RH_RF24, the complete properties set dumped to a file with printRegisters, then 
+// a 30MHz XO.
+// The configurations were imported into RH_RF24, the complete properties set dumped to a file with printRegisters, then
 // RH_RF24_property_data/convert.pl was used to generate the entry for this table.
 // Contributions of new complete and tested ModemConfigs ready to add to this list will be readily accepted.
 // Casual suggestions of new schemes without working examples will probably be passed over.
@@ -35,7 +35,7 @@ PROGMEM static const RH_RF24::ModemConfig MODEM_CONFIG_TABLE[] =
 
     // FSK_Rb50Fd100
     { 0x02, 0x07, 0xa1, 0x20, 0x01, 0x00, 0x1b, 0x4f, 0x01, 0x00, 0x10, 0x00, 0xc8, 0x02, 0x8f, 0x5c, 0x01, 0x48, 0x02, 0x36, 0x80, 0x92, 0x0a, 0x46, 0xe2, 0x11, 0x2c, 0x2c, 0x00, 0x02, 0xff, 0xff, 0x00, 0x29, 0x02, 0x83, 0x02, 0x7f, 0x40, 0xff, 0xc4, 0x30, 0x7f, 0xf5, 0xb5, 0xb8, 0xde, 0x05, 0x17, 0x16, 0x0c, 0x03, 0x00, 0x15, 0xff, 0x00, 0x00, 0xff, 0xc4, 0x30, 0x7f, 0xf5, 0xb5, 0xb8, 0xde, 0x05, 0x17, 0x16, 0x0c, 0x03, 0x00, 0x15, 0xff, 0x00, 0x00, 0x3f, 0x2c, 0x0e, 0x04, 0x0c, 0x73, },
-  
+
     //FSK_Rb150Fd300
     { 0x02, 0x16, 0xe3, 0x60, 0x01, 0x00, 0x51, 0xec, 0x01, 0x00, 0x30, 0x00, 0xc8, 0x02, 0x8f, 0x5c, 0x01, 0x48, 0x02, 0x47, 0x83, 0x6a, 0x04, 0xb5, 0xe2, 0x22, 0x16, 0x16, 0x00, 0x02, 0xff, 0xff, 0x00, 0x29, 0x02, 0x83, 0x02, 0x7f, 0x40, 0xff, 0xc4, 0x30, 0x7f, 0xf5, 0xb5, 0xb8, 0xde, 0x05, 0x17, 0x16, 0x0c, 0x03, 0x00, 0x15, 0xff, 0x00, 0x00, 0xff, 0xc4, 0x30, 0x7f, 0xf5, 0xb5, 0xb8, 0xde, 0x05, 0x17, 0x16, 0x0c, 0x03, 0x00, 0x15, 0xff, 0x00, 0x00, 0x3f, 0x39, 0x04, 0x05, 0x04, 0x01, },
 
@@ -111,12 +111,12 @@ bool RH_RF24::init()
     // Add by Adrien van den Bossche <vandenbo@univ-tlse2.fr> for Teensy
     // ARM M4 requires the below. else pin interrupt doesn't work properly.
     // On all other platforms, its innocuous, belt and braces
-    pinMode(_interruptPin, INPUT); 
+    pinMode(_interruptPin, INPUT);
 
     // Set up interrupt handler
     // Since there are a limited number of interrupt glue functions isr*() available,
     // we can only support a limited number of devices simultaneously
-    // ON some devices, notably most Arduinos, the interrupt pin passed in is actuallt the 
+    // ON some devices, notably most Arduinos, the interrupt pin passed in is actuallt the
     // interrupt number. You have to figure out the interruptnumber-to-interruptpin mapping
     // yourself based on knwledge of what Arduino board you are running on.
     if (_myInterruptIndex == 0xff)
@@ -185,7 +185,7 @@ bool RH_RF24::init()
     // An innocuous ISM frequency, same as RF22's
     setFrequency(434.0);
     // About 2.4dBm on RFM24:
-    setTxPower(0x10); 
+    setTxPower(0x10);
 
     return true;
 }
@@ -224,7 +224,7 @@ void RH_RF24::handleInterrupt()
 	}
 	if (status[2] & RH_RF24_INT_STATUS_PACKET_SENT)
 	{
-	    _txGood++; 
+	    _txGood++;
 	    // Transmission does not automatically clear the tx buffer.
 	    // Could retransmit if we wanted
 	    // RH_RF24 configured to transition automatically to Idle after packet sent
@@ -239,7 +239,7 @@ void RH_RF24::handleInterrupt()
 	    command(RH_RF24_CMD_GET_MODEM_STATUS, NULL, 0, modem_status, sizeof(modem_status));
 	    _lastRssi = modem_status[3];
 	    _lastPreambleTime = millis();
-	    
+
 	    // Save it in our buffer
 	    readNextFragment();
 	    // And see if we have a valid message
@@ -347,7 +347,7 @@ bool RH_RF24::send(const uint8_t* data, uint8_t len)
     waitPacketSent(); // Make sure we dont interrupt an outgoing message
     setModeIdle(); // Prevent RX while filling the fifo
 
-    if (!waitCAD()) 
+    if (!waitCAD())
 	return false;  // Check channel activity
 
     // Put the payload in the FIFO
@@ -412,7 +412,7 @@ void RH_RF24::readNextFragment()
     // Get the packet length from the RX FIFO length
     uint8_t fifo_info[1];
     command(RH_RF24_CMD_FIFO_INFO, NULL, 0, fifo_info, sizeof(fifo_info));
-    uint8_t fifo_len = fifo_info[0]; 
+    uint8_t fifo_len = fifo_info[0];
 
     // Check for overflow
     if ((_bufLen + fifo_len) > sizeof(_buf))
@@ -544,7 +544,7 @@ bool RH_RF24::setModemConfig(ModemConfigChoice index)
 
 void RH_RF24::setPreambleLength(uint16_t bytes)
 {
-    uint8_t config[] = { (uint8_t)bytes, 0x14, 0x00, 0x00, 
+    uint8_t config[] = { (uint8_t)bytes, 0x14, 0x00, 0x00,
 			 RH_RF24_PREAMBLE_FIRST_1 | RH_RF24_PREAMBLE_LENGTH_BYTES | RH_RF24_PREAMBLE_STANDARD_1010};
     set_properties(RH_RF24_PROPERTY_PREAMBLE_TX_LENGTH, config, sizeof(config));
 }
@@ -590,7 +590,7 @@ bool RH_RF24::setFrequency(float centre, float afcPullInRange)
 	    outdiv = 12, band = 3;
 	else if (centre <= 175.0 && centre >= 142.0)
 	    outdiv = 24, band = 5;
-	else 
+	else
 	    return false;
     }
     else
@@ -609,7 +609,7 @@ bool RH_RF24::setFrequency(float centre, float afcPullInRange)
 	    outdiv = 16, band = 4;
 	else if (centre < 169.0 && centre >= 119.0)
 	    outdiv = 24, band = 5;
-	else 
+	else
 	    return false;
     }
 
@@ -627,10 +627,10 @@ bool RH_RF24::setFrequency(float centre, float afcPullInRange)
     unsigned int n = ((unsigned int)(centre / f_pfd)) - 1;
     float ratio = centre / (float)f_pfd;
     float rest  = ratio - (float)n;
-    unsigned long m = (unsigned long)(rest * 524288UL); 
+    unsigned long m = (unsigned long)(rest * 524288UL);
     unsigned int m2 = m / 0x10000;
     unsigned int m1 = (m - m2 * 0x10000) / 0x100;
-    unsigned int m0 = (m - m2 * 0x10000 - m1 * 0x100); 
+    unsigned int m0 = (m - m2 * 0x10000 - m1 * 0x100);
 
     // PROP_FREQ_CONTROL_GROUP
     uint8_t freq_control[] = { (uint8_t)n, (uint8_t)m2, (uint8_t)m1, (uint8_t)m0 };
@@ -673,7 +673,7 @@ void RH_RF24::setModeRx()
 	// Tell the receiver the max data length we will accept (a TX may have changed it)
 	uint8_t l[] = { sizeof(_buf) };
 	set_properties(RH_RF24_PROPERTY_PKT_FIELD_2_LENGTH_7_0, l, sizeof(l));
-	
+
 	// Set the antenna switch pins using the GPIO, assuming we have an RFM module with antenna switch
 	uint8_t gpio_config[] = { RH_RF24_GPIO_HIGH, RH_RF24_GPIO_LOW };
 	command(RH_RF24_CMD_GPIO_PIN_CFG, gpio_config, sizeof(gpio_config));
@@ -692,7 +692,7 @@ void RH_RF24::setModeTx()
 	uint8_t config[] = { RH_RF24_GPIO_LOW, RH_RF24_GPIO_HIGH };
 	command(RH_RF24_CMD_GPIO_PIN_CFG, config, sizeof(config));
 
-	uint8_t tx_params[] = { 0x00, 
+	uint8_t tx_params[] = { 0x00,
 				(uint8_t)((_idleMode << 4) | RH_RF24_CONDITION_RETRANSMIT_NO | RH_RF24_CONDITION_START_IMMEDIATE)};
 	command(RH_RF24_CMD_START_TX, tx_params, sizeof(tx_params));
 	_mode = RHModeTx;
@@ -731,7 +731,7 @@ void RH_RF24::setTxPower(uint8_t power)
     set_properties(RH_RF24_PROPERTY_PA_MODE, power_properties, sizeof(power_properties));
 }
 
-// Caution: There was a bug in A1 hardware that will not handle 1 byte commands. 
+// Caution: There was a bug in A1 hardware that will not handle 1 byte commands.
 bool RH_RF24::command(uint8_t cmd, const uint8_t* write_buf, uint8_t write_len, uint8_t* read_buf, uint8_t read_len)
 {
     bool   done = false;
@@ -784,11 +784,11 @@ bool RH_RF24::command(uint8_t cmd, const uint8_t* write_buf, uint8_t write_len, 
 
 bool RH_RF24::configure(const uint8_t* commands)
 {
-    // Command strings are constructed in radio_config_Si4460.h 
+    // Command strings are constructed in radio_config_Si4460.h
     // Each command starts with a count of the bytes in that command:
     // <bytecount> <command> <bytecount-2 bytes of args/data>
     uint8_t next_cmd_len;
-    
+
     while (memcpy_P(&next_cmd_len, commands, 1), next_cmd_len > 0)
     {
 	uint8_t buf[20]; // As least big as the biggest permitted command/property list of 15
@@ -801,7 +801,7 @@ bool RH_RF24::configure(const uint8_t* commands)
 
 void RH_RF24::power_on_reset()
 {
-    // Sigh: its necessary to control the SDN pin to reset this ship. 
+    // Sigh: its necessary to control the SDN pin to reset this ship.
     // Tying it to GND does not produce reliable startups
     // Per Si4464 Data Sheet 3.3.2
     digitalWrite(_sdnPin, HIGH); // So we dont get a glitch after setting pinMode OUTPUT
@@ -813,7 +813,7 @@ void RH_RF24::power_on_reset()
 
 bool RH_RF24::cmd_clear_all_interrupts()
 {
-    uint8_t write_buf[] = { 0x00, 0x00, 0x00 }; 
+    uint8_t write_buf[] = { 0x00, 0x00, 0x00 };
     return command(RH_RF24_CMD_GET_INT_STATUS, write_buf, sizeof(write_buf));
 }
 
@@ -907,11 +907,11 @@ PROGMEM static const RH_RF24::CommandInfo commands[] =
 // List of properties to be printed by printRegisters()
 PROGMEM static const uint16_t properties[] =
 {
-    RH_RF24_PROPERTY_GLOBAL_XO_TUNE,                   
-    RH_RF24_PROPERTY_GLOBAL_CLK_CFG,                   
-    RH_RF24_PROPERTY_GLOBAL_LOW_BATT_THRESH,           
-    RH_RF24_PROPERTY_GLOBAL_CONFIG,                    
-    RH_RF24_PROPERTY_GLOBAL_WUT_CONFIG,               
+    RH_RF24_PROPERTY_GLOBAL_XO_TUNE,
+    RH_RF24_PROPERTY_GLOBAL_CLK_CFG,
+    RH_RF24_PROPERTY_GLOBAL_LOW_BATT_THRESH,
+    RH_RF24_PROPERTY_GLOBAL_CONFIG,
+    RH_RF24_PROPERTY_GLOBAL_WUT_CONFIG,
     RH_RF24_PROPERTY_GLOBAL_WUT_M_15_8,
     RH_RF24_PROPERTY_GLOBAL_WUT_M_7_0,
     RH_RF24_PROPERTY_GLOBAL_WUT_R,
@@ -1120,7 +1120,7 @@ PROGMEM static const uint16_t properties[] =
 #define	NUM_PROPERTIES (sizeof(properties)/sizeof(uint16_t))
 
 bool RH_RF24::printRegisters()
-{  
+{
 #ifdef RH_HAVE_SERIAL
     uint8_t i;
     // First print the commands that return interesting data
@@ -1153,7 +1153,7 @@ bool RH_RF24::printRegisters()
 	uint8_t result;
 	get_properties(prop, &result, 1);
 	Serial.print("prop: ");
-	Serial.print(prop, HEX);
+	Serial.print((unsigned char)prop, HEX);
 	Serial.print(": ");
 	Serial.print(result, HEX);
         Serial.println("");

@@ -155,34 +155,35 @@ void SerialSimulator::begin(int baud)
 
 size_t SerialSimulator::println(const char* s)
 {
-  print(s);
-  printf("\n");
+  size_t q = print(s);
+  return q + printf("\n");
 }
 
 size_t SerialSimulator::print(const char* s)
 {
-  printf(s);
+  return printf(s);
 }
 
 size_t SerialSimulator::print(unsigned int n, int base)
 {
   if (base == DEC)
-    printf("%d", n);
-  else if (base == HEX)
-    printf("%02x", n);
-  else if (base == OCT)
-    printf("%o", n);
+    return printf("%d", n);
+  if (base == HEX)
+    return printf("%02x", n);
+  if (base == OCT)
+    return printf("%o", n);
   // TODO: BIN
+  return (size_t)0;
 }
 
 size_t SerialSimulator::print(char ch)
 {
-  printf("%c", ch);
+  return printf("%c", ch);
 }
 
 size_t SerialSimulator::println(char ch)
 {
-  printf("%c\n", ch);
+  return printf("%c\n", ch);
 }
 
 size_t SerialSimulator::print(unsigned char ch, int base)
@@ -192,8 +193,8 @@ size_t SerialSimulator::print(unsigned char ch, int base)
 
 size_t SerialSimulator::println(unsigned char ch, int base)
 {
-  print((unsigned int)ch, base);
-  printf("\n");
+  size_t q = print((unsigned int)ch, base);
+  return q + printf("\n");
 }
 
 

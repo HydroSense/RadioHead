@@ -18,7 +18,8 @@ HardwareSPI SPI(1);
 // Declare an SPI interface to use
 HardwareSPI SPI(1);
 #elif (RH_PLATFORM == RH_PLATFORM_RASPI) // raspberry pi
-HardwareSPI SPI(1); // default to chanenl 0
+HardwareSPI SPI(1); // on the pi2/3 channel 1 is on the header
+//HardwareSPI SPI(0); // default to chanenl 0
 #endif
 
 // Arduino Due has default SPI pins on central SPI headers, and not on 10, 11, 12, 13

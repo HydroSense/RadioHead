@@ -540,6 +540,14 @@ public:
     uint8_t   recv_bytes;
   };
 
+  struct pin_config{
+    int8_t cs;
+    int8_t interrupt;
+    int8_t fhss_interrupt;
+    int8_t reset;
+    int8_t tx_led;
+    int8_t rx_led;
+  };
   /// \brief Defines register values for a set of modem configuration registers
   ///
   /// Defines register values for a set of modem configuration registers
@@ -600,9 +608,9 @@ public:
   /// On other boards, any digital pin may be used.
   /// \param[in] spi Pointer to the SPI interface object to use.
   ///                Defaults to the standard Arduino hardware SPI interface
-  RH_RF95(uint8_t slaveSelectPin = SS, uint8_t interruptPin = 2,
-      uint8_t fhssInterruptPin = 5,
-      RHGenericSPI& spi = hardware_spi, void (*rxCallback)(void) = NULL);
+  RH_RF95(struct pin_config pc,
+      RHGenericSPI& spi = hardware_spi,
+      void (*rxCallback)(void) = NULL);
 
   /// Initialise the Driver transport hardware and software.
   /// Make sure the Driver is properly configured before calling init().
@@ -652,7 +660,7 @@ public:
   /// \param[in,out] len Pointer to available space in buf. Set to the actual number of octets copied.
   /// \return true if a valid message was copied to buf
   virtual bool    recv(uint8_t* buf, uint8_t* len);
-    
+
   //virtual uint8_t recv(uint8_t* buf);
 
   // sets the hopping period, 1st hop is always after the
@@ -772,6 +780,9 @@ public:
   /// \return true if channel is in use.
   virtual bool    isChannelActive();
 
+  // this should be private but some setup happens
+  // in protocol::setup_radio that should be moved here.
+  struct pin_config   _pins;
 protected:
   /// This is a low level function to handle the interrupts for one instance of RH_RF95.
   /// Called automatically by isr*()
@@ -842,7 +853,7 @@ private:
   struct perf_counter _perf;
 
   // current radio modem config
-  ModemConfigChoice _current_modem_config; 
+  ModemConfigChoice _current_modem_config;
 };
 
 /// @example rf95_client.pde

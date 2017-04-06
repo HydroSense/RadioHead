@@ -2,7 +2,7 @@
 //
 // Routines for implementing RadioHead on Raspberry Pi
 // ported to use WiringPi to enable interrupts by Alan Marchiori
-// Modified by the file contributed by Mike Poublon 
+// Modified by the file contributed by Mike Poublon
 
 #ifndef RASPI_h
 #define RASPI_h
@@ -47,7 +47,7 @@ class HardwareSPI
     // SPI Configuration methods
     void begin(); // Default
     void begin(int);
-    void end();    
+    void end();
   private:
     int _fd;
     int _chan;
