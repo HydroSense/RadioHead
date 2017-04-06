@@ -609,7 +609,8 @@ public:
   /// \param[in] spi Pointer to the SPI interface object to use.
   ///                Defaults to the standard Arduino hardware SPI interface
   RH_RF95(struct pin_config pc,
-      RHGenericSPI& spi = hardware_spi, void (*rxCallback)(void) = NULL);
+      RHGenericSPI& spi = hardware_spi,
+      void (*rxCallback)(void) = NULL);
 
   /// Initialise the Driver transport hardware and software.
   /// Make sure the Driver is properly configured before calling init().

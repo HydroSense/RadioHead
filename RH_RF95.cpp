@@ -50,10 +50,11 @@ PROGMEM static const uint32_t FHSS_CHANNEL_TABLE[] =
 extern void mprint(const char *format, ...);
 
 RH_RF95::RH_RF95(struct pin_config pc,
-  RHGenericSPI& spi, void (*rxCallback)(void))
+  RHGenericSPI& spi,
+  void (*rxCallback)(void))
 : RHSPIDriver(pc.cs, spi),
-  _rxBufValid(0),
-  _pins(pc)
+  _pins(pc),
+  _rxBufValid(0)
 {
   _rxCallback = rxCallback;
   _myInterruptIndex = 0xff; // Not allocated yet
@@ -146,7 +147,7 @@ bool RH_RF95::init()
     return false; // Too many devices, not enough interrupt vectors
 
   // added by AMM, if the radio has a pending interrupt, we must clear it now
-  uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
+  //uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
   // if (irq_flags > 0){
   //   printf("irq_flags: 0x%02x\n", irq_flags);
   // }
@@ -602,6 +603,7 @@ void RH_RF95::validateRxBuf()
     // Serial.print("====FHSS ch is now ");
     // Serial.print(i % RH_RF95_FHSS_CHANNELS);
     // Serial.println("====");
+    return true;
   }
   bool RH_RF95::setFrequency(float centre)
   {
