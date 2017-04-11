@@ -12,7 +12,7 @@ SRCEXT := cpp
 SOURCES := $(shell find $(SRCDIR) -type f -name '*.$(SRCEXT)')
 OBJECTS := $(patsubst $(SRCDIR)/%,$(BUILDDIR)/%,$(SOURCES:.$(SRCEXT)=.o))
 #removed -DBCM2835_NO_DELAY_COMPATIBILITY, not needed?
-CFLAGS := -DRASPBERRY_PI -g -lm -Wall
+override CFLAGS += -DRASPBERRY_PI -g -lm -Wall
 LIB := -lwiringPi
 INC := -I. -I./RHutil
 #

@@ -5,6 +5,7 @@
 
 #include <RH_RF95.h>
 
+#include <stdarg.h>
 
 // Interrupt vectors for the 3 Arduino interrupt pins
 // Each interrupt can be handled by a different instance of RH_RF95, allowing you to have
@@ -16,6 +17,7 @@ uint8_t RH_RF95::_interruptCount = 0; // Index into _deviceForInterrupt for next
 // Stored in flash (program) memory to save SRAM
 PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
 {
+  {0, 0, 0}, // Null
   //  1d,     1e,      26
   { 0x72,   0x74,    0x00}, // Bw125Cr45Sf128 (the chip default)
   { 0x92,   0x74,    0x00}, // Bw500Cr45Sf128
@@ -27,6 +29,19 @@ PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
   { 0x92,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5
   { 0x98,   0xc4,    0x0c}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE
   { 0x98,   0xc0,    0x04}, // Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC,
+};
+PROGMEM static const char* MODEM_CONFIG_STR[] =
+{
+  "NullConfig",
+  "Bw125Cr45Sf128",
+  "Bw500Cr45Sf128",
+  "Bw31_25Cr48Sf512",
+  "Bw125Cr48Sf4096",
+  "Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC",
+  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC",
+  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5",
+  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE",
+  "Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC"
 };
 
 /* MHz
@@ -54,7 +69,8 @@ RH_RF95::RH_RF95(struct pin_config pc,
   void (*rxCallback)(void))
 : RHSPIDriver(pc.cs, spi),
   _pins(pc),
-  _rxBufValid(0)
+  _rxBufValid(0),
+  _current_modem_config(Bw125Cr45Sf128)
 {
   _rxCallback = rxCallback;
   _myInterruptIndex = 0xff; // Not allocated yet
@@ -767,19 +783,31 @@ void RH_RF95::validateRxBuf()
   // Returns true if its a valid choice
   bool RH_RF95::setModemConfig(ModemConfigChoice index)
   {
-    if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig)))
+    //mprint("SetmodemConfig!\n");
+    if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig))){
+      mprint("ERROR: Modem config out of bounds!\n");
       return false;
+    }
 
     // if it's the same radio modem config, don't change anything
-    if(index == this->_current_modem_config)
-        return true;
-    else
-        this->_current_modem_config = index;
+    if(index == this->_current_modem_config){
+      //mprint("Modem config already set\n");
+
+      return true;
+    }
+
+    // must wait for TX to finish
+    while (_mode == RHModeTx);
+    //force idle before changing config.
+    setModeIdle();
+
+    this->_current_modem_config = index;
 
     ModemConfig cfg;
     memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RH_RF95::ModemConfig));
     setModemRegisters(&cfg);
 
+    mprint("Set modem config: %s\n", MODEM_CONFIG_STR[index]);
     return true;
   }
 
