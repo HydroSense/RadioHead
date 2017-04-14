@@ -15,34 +15,34 @@ uint8_t RH_RF95::_interruptCount = 0; // Index into _deviceForInterrupt for next
 
 // These are indexed by the values of ModemConfigChoice
 // Stored in flash (program) memory to save SRAM
-PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
-{
-  {0, 0, 0}, // Null
-  //  1d,     1e,      26
-  { 0x72,   0x74,    0x00}, // Bw125Cr45Sf128 (the chip default)
-  { 0x92,   0x74,    0x00}, // Bw500Cr45Sf128
-  { 0x48,   0x94,    0x00}, // Bw31_25Cr48Sf512
-  { 0x78,   0xc4,    0x00}, // Bw125Cr48Sf4096
-
-  { 0x99,   0xc0,    0x04}, // Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC
-  { 0x98,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC,
-  { 0x92,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5
-  { 0x98,   0xc4,    0x0c}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE
-  { 0x98,   0xc0,    0x04}, // Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC,
-};
-PROGMEM static const char* MODEM_CONFIG_STR[] =
-{
-  "NullConfig",
-  "Bw125Cr45Sf128",
-  "Bw500Cr45Sf128",
-  "Bw31_25Cr48Sf512",
-  "Bw125Cr48Sf4096",
-  "Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC",
-  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC",
-  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5",
-  "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE",
-  "Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC"
-};
+// PROGMEM static const RH_RF95::ModemConfig MODEM_CONFIG_TABLE[] =
+// {
+//   {0, 0, 0}, // Null
+//   //  1d,     1e,      26
+//   { 0x72,   0x74,    0x00}, // Bw125Cr45Sf128 (the chip default)
+//   { 0x92,   0x74,    0x00}, // Bw500Cr45Sf128
+//   { 0x48,   0x94,    0x00}, // Bw31_25Cr48Sf512
+//   { 0x78,   0xc4,    0x00}, // Bw125Cr48Sf4096
+//
+//   { 0x99,   0xc0,    0x04}, // Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC
+//   { 0x98,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC,
+//   { 0x92,   0xc4,    0x04}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5
+//   { 0x98,   0xc4,    0x0c}, // Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE
+//   { 0x98,   0xc0,    0x04}, // Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC,
+// };
+// PROGMEM static const char* MODEM_CONFIG_STR[] =
+// {
+//   "NullConfig",
+//   "Bw125Cr45Sf128",
+//   "Bw500Cr45Sf128",
+//   "Bw31_25Cr48Sf512",
+//   "Bw125Cr48Sf4096",
+//   "Bw500 Sf4096 Implicit Headers, NO CRC, autoAGC",
+//   "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC",
+//   "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, CR=4/5",
+//   "Bw500 Sf4096 Explicit Headers, YES CRC, autoAGC, LOW DR OPTIMIZE",
+//   "Bw500 Sf4096 Explicit Headers, NO CRC, autoAGC"
+// };
 
 /* MHz
 902.2746582 903.3239746 904.373291 905.4226074 906.4719238
@@ -69,9 +69,11 @@ RH_RF95::RH_RF95(struct pin_config pc,
   void (*rxCallback)(void))
 : RHSPIDriver(pc.cs, spi),
   _pins(pc),
-  _rxBufValid(0),
-  _current_modem_config(Bw125Cr45Sf128)
+  _rxBufValid(0)
 {
+  _current_modem_config.reg_1d = 0;
+  _current_modem_config.reg_1e = 0;
+  _current_modem_config.reg_26 = 0;
   _rxCallback = rxCallback;
   _myInterruptIndex = 0xff; // Not allocated yet
   _useFhss = 0;
@@ -84,8 +86,30 @@ bool RH_RF95::init()
     return false;
   }
 
+  if (_pins.tx_led >= 0){
+    pinMode(_pins.tx_led, OUTPUT);
+    digitalWrite(_pins.tx_led, LOW);
+
+  }
+  if (_pins.rx_led >= 0){
+    pinMode(_pins.rx_led, OUTPUT);
+    digitalWrite(_pins.rx_led, LOW);
+  }
+
+  pinMode(_pins.reset, OUTPUT);
+  digitalWrite(_pins.reset, HIGH);
+  delay(50);
+  digitalWrite(_pins.reset, LOW);
+  delay(50);
+  digitalWrite(_pins.reset, HIGH);
+  delay(50);
+  pinMode(_pins.reset, INPUT);
+  mprint("Reset rf95.\n");
+  delay(50);
+
   // Determine the interrupt number that corresponds to the interruptPin
   int interruptNumber = digitalPinToInterrupt(_pins.interrupt);
+
 
   //printf("digitalPinToInterrupt(%d)==%d\n", _interruptPin, interruptNumber);
   if (interruptNumber == NOT_AN_INTERRUPT){
@@ -93,8 +117,9 @@ bool RH_RF95::init()
     return false;
   }
   #ifdef RH_ATTACHINTERRUPT_TAKES_PIN_NUMBER
-  interruptNumber = _interruptPin;
+  interruptNumber = _pins.interrupt;
   #endif
+  mprint("Int number is %d for pin %d\n", interruptNumber, _pins.interrupt);
 
   // No way to check the device type :-(
 
@@ -116,8 +141,7 @@ bool RH_RF95::init()
 
   _chipver = spiRead(RH_RF95_REG_42_VERSION);
 
-  // Serial.print("CHIPVER: ");
-  // Serial.println(chipver);
+  mprint("CHIPVER: 0x%x\n", _chipver);
 
   _perf.interrupt_count = 0;
   _perf.rx_timeout = 0;
@@ -127,8 +151,18 @@ bool RH_RF95::init()
   // ARM M4 requires the below. else pin interrupt doesn't work properly.
   // On all other platforms, its innocuous, belt and braces
   pinMode(_pins.interrupt, INPUT);
-  if (_pins.fhss_interrupt >= 0)
+
+  if (_pins.fhss_interrupt >= 0){
+    mprint("FHSS interrupt pin %d.\n", _pins.fhss_interrupt);
     pinMode(_pins.fhss_interrupt, INPUT);
+  }
+
+  if (_pins.rx_led >=0 ){
+    pinMode(_pins.rx_led, OUTPUT);
+  }
+  if (_pins.tx_led >= 0){
+    pinMode(_pins.tx_led, OUTPUT);
+  }
 
   // Set up interrupt handler
   // Since there are a limited number of interrupt glue functions isr*() available,
@@ -159,15 +193,17 @@ bool RH_RF95::init()
     attachInterrupt(interruptNumber, isr2, RISING);
     if (_pins.fhss_interrupt >= 0)
       attachInterrupt(digitalPinToInterrupt(_pins.fhss_interrupt), fhss_isr2, RISING);
-  } else
-    return false; // Too many devices, not enough interrupt vectors
-
+  } else{
+      mprint("ERROR: no more interrupts!\n");
+      return false; // Too many devices, not enough interrupt vectors
+  }
   // added by AMM, if the radio has a pending interrupt, we must clear it now
   //uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
   // if (irq_flags > 0){
   //   printf("irq_flags: 0x%02x\n", irq_flags);
   // }
   spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
+  spiWrite(RH_RF95_REG_11_IRQ_FLAGS_MASK, 0); // enable all interrupts
 
   // Set up FIFO
   // We configure so that we can use the entire 256 byte FIFO for either receive
@@ -186,7 +222,7 @@ bool RH_RF95::init()
 
   // Set up default configuration
   // No Sync Words in LORA mode.
-  setModemConfig(Bw125Cr45Sf128); // Radio default
+  //setModemConfig(Bw125Cr45Sf128); // Radio default
   //    setModemConfig(Bw125Cr48Sf4096); // slow and reliable?
   setPreambleLength(8); // Default is 8
   // An innocuous ISM frequency, same as RF22's
@@ -194,7 +230,7 @@ bool RH_RF95::init()
   // setFrequency(434.0);
   // Lowish power
   // leave radio at default power
-  // setTxPower(13);
+  setTxPower(13);
 
   setModeIdle();
 
@@ -206,7 +242,7 @@ bool RH_RF95::init()
 // program the new channel and clear the ChangeChanelFhss by writing a 1
 void RH_RF95::handleFhssInterrupt()
 {
-
+  mprint("@FHss\n");
 
   setFhssChannel();
 
@@ -224,10 +260,11 @@ void RH_RF95::handleInterrupt()
   _perf.interrupt = millis();
   _perf.interrupt_count ++;
 
+  //mprint("@");
   // Read the interrupt register
   uint8_t irq_flags = spiRead(RH_RF95_REG_12_IRQ_FLAGS);
   if (_mode == RHModeRx && irq_flags & (RH_RF95_RX_TIMEOUT | RH_RF95_PAYLOAD_CRC_ERROR))
-  {
+  { //mprint("RXt");
     if (irq_flags & RH_RF95_RX_TIMEOUT){
       _perf.rx_timeout ++;
     }
@@ -238,12 +275,14 @@ void RH_RF95::handleInterrupt()
   }
   else if (_mode == RHModeRx && irq_flags & RH_RF95_CAD_DONE){
     // CAD detected, just get the time and wait for RxDone
+    //mprint("RxCADd");
     _perf.cad_done = millis();
     _perf.cad_cnt++;
     spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x00); // Interrupt on RxDone
   }
   else if (_mode == RHModeRx && irq_flags & RH_RF95_RX_DONE)
   {
+    //mprint("RXd");
     _perf.rx_done= millis();
 
 
@@ -264,10 +303,10 @@ void RH_RF95::handleInterrupt()
     // Remember the RSSI of this packet
     // this is according to the doc, but is it really correct?
     // weakest receiveable signals are reported RSSI at about -66
-    //_lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 137;
+    _lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 137;
 
     // the semtech datasheet pg 87 has a different value.
-    _lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 157;
+    //_lastRssi = spiRead(RH_RF95_REG_1A_PKT_RSSI_VALUE) - 157;
 
 
     // We have received a message.
@@ -290,6 +329,7 @@ void RH_RF95::handleInterrupt()
   }
   else if (_mode == RHModeTx && irq_flags & RH_RF95_TX_DONE)
   {
+    //mprint("TXd");
     if (_pins.tx_led >=0 ){
 
       digitalWrite(_pins.tx_led, LOW);
@@ -300,6 +340,7 @@ void RH_RF95::handleInterrupt()
   }
   else if (_mode == RHModeCad && irq_flags & RH_RF95_CAD_DONE)
   {
+    //mprint("CADd");
     _perf.cad_done = millis();
     _perf.cad_cnt++;
     _cad = irq_flags & RH_RF95_CAD_DETECTED;
@@ -311,8 +352,10 @@ void RH_RF95::handleInterrupt()
       //keep checking.
       //setModeCAD();
     }
+  }else{
+    mprint("!0x%x!\n", irq_flags);
   }
-
+  //mprint("\n");
   // don't clear FhssChangeChannel
   //spiWrite(RH_RF95_REG_12_IRQ_FLAGS, 0xff); // Clear all IRQ flags
 
@@ -427,6 +470,11 @@ void RH_RF95::validateRxBuf()
 
   bool    RH_RF95::setFhssHoppingPeriod(uint8_t i){
     _useFhss = i > 0;
+    if (_useFhss){
+      mprint("FHSS enabled\n");
+    }else{
+      mprint("FHSS disabled\n");
+    }
     spiWrite(RH_RF95_REG_24_HOP_PERIOD, i);
     return true;
   }
@@ -482,6 +530,9 @@ void RH_RF95::validateRxBuf()
      case 9: // 500 kHz
          bw = 500;
          break;
+     default:
+        mprint("Uknown bandiwdth!\n");
+        return 0;
      }
 
           //
@@ -534,7 +585,7 @@ void RH_RF95::validateRxBuf()
      return airTime;
   }
   bool RH_RF95::writefifo(const uint8_t* data, uint8_t len){
-    _perf.send_call = millis();
+    //_perf.send_call = millis();
     if (len > RH_RF95_MAX_MESSAGE_LEN)
       return false;
 
@@ -544,6 +595,7 @@ void RH_RF95::validateRxBuf()
     spiWrite(RH_RF95_REG_0D_FIFO_ADDR_PTR, 0);
 
 #ifdef RH_RF95_SEND_RH_HEADER
+    mprint("using RH_headers\n");
     // The headers
     spiWrite(RH_RF95_REG_00_FIFO, _txHeaderTo);
     spiWrite(RH_RF95_REG_00_FIFO, _txHeaderFrom);
@@ -554,6 +606,7 @@ void RH_RF95::validateRxBuf()
     spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len + RH_RF95_HEADER_LEN);
     _pref.sent_bytes = len+ RH_RF95_HEADER_LEN;
 #else
+
     // The message data
     spiBurstWrite(RH_RF95_REG_00_FIFO, data, len);
     spiWrite(RH_RF95_REG_22_PAYLOAD_LENGTH, len);
@@ -573,13 +626,13 @@ void RH_RF95::validateRxBuf()
 
     if (writefifo(data, len)){
       if (_pins.tx_led >=0 ){
-
         digitalWrite(_pins.tx_led, HIGH);
       }
       setModeTx(); // Start the transmitter
       // when Tx is done, interruptHandler will fire and radio mode will return to STANDBY
       return true;
     }else{
+      setModeIdle();
       return false;
     }
   }
@@ -623,6 +676,7 @@ void RH_RF95::validateRxBuf()
   }
   bool RH_RF95::setFrequency(float centre)
   {
+    mprint("setFreq to %d.%d\n", (int)centre, (centre-(int)centre)*1000);
     // Frf = FRF / FSTEP
     uint32_t frf = (centre * 1000000.0) / RH_RF95_FSTEP;
     _freq = frf;
@@ -680,8 +734,9 @@ void RH_RF95::validateRxBuf()
     {
       _perf.tx_mode = millis();
 
-      if (_useFhss)
+      if (_useFhss){
         setFhssChannel();
+      }
 
       spiWrite(RH_RF95_REG_01_OP_MODE, RH_RF95_LONG_RANGE_MODE | RH_RF95_MODE_TX);
       spiWrite(RH_RF95_REG_40_DIO_MAPPING1, 0x40); // Interrupt on TxDone
@@ -692,7 +747,7 @@ void RH_RF95::validateRxBuf()
   void RH_RF95::setTxPower(int8_t power)
   {
     // rewritten to always use PA_BOOST since RFO pin doesn't seem to be connected.
-
+    mprint("setPower to %d\n", power);
     // Sigh, different behaviours depending on whther the module use PA_BOOST or the RFO pin
     // for the transmitter output
     // if (useRFO)
@@ -747,7 +802,18 @@ void RH_RF95::validateRxBuf()
   // Sets registers from a canned modem configuration structure
   void RH_RF95::setModemRegisters(const ModemConfig* config)
   {
+    //wait for any TX to finish.
+    while (_mode == RHModeTx) mprint("tx wait\n");
     setModeIdle(); // standby radio mode before reconfiguring radio
+
+    // mprint("set mcfg: 0x%x, 0x%x, 0x%x\n",
+    //   config->reg_1d,
+    //   config->reg_1e,
+    //   config->reg_26);
+
+    _current_modem_config.reg_1d = config->reg_1d;
+    _current_modem_config.reg_1e = config->reg_1e;
+    _current_modem_config.reg_26 = config->reg_26;
 
     _bw = config->reg_1d >> 4;
     _cr = (config->reg_1d >> 1) & 0x7;
@@ -779,37 +845,77 @@ void RH_RF95::validateRxBuf()
 
   }
 
-  // Set one of the canned FSK Modem configs
-  // Returns true if its a valid choice
-  bool RH_RF95::setModemConfig(ModemConfigChoice index)
-  {
-    //mprint("SetmodemConfig!\n");
-    if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig))){
-      mprint("ERROR: Modem config out of bounds!\n");
-      return false;
-    }
-
-    // if it's the same radio modem config, don't change anything
-    if(index == this->_current_modem_config){
-      //mprint("Modem config already set\n");
-
-      return true;
-    }
-
-    // must wait for TX to finish
-    while (_mode == RHModeTx);
-    //force idle before changing config.
-    setModeIdle();
-
-    this->_current_modem_config = index;
-
+  bool RH_RF95::setModemConfig(
+    float     bandwidth_khz,
+    uint8_t   coding_rate,  // 4/4+x  where x = 1..4
+    bool      implicit_header, // 1=implicit header [fixed_length], 0=explicit header
+    uint8_t   spreading_factor, // 2^sf where sf = 6..12
+    bool      crc, // 1=include crc, 0=no crc sent with packet
+    bool      mobile //1=mobile node, 0=static node (sends extra bits!) also known as LOW_RD optimize
+  ){
+    spreading_factor &= 0xF;
+    coding_rate &= 0x7; // remove all the uncessary bits
     ModemConfig cfg;
-    memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RH_RF95::ModemConfig));
-    setModemRegisters(&cfg);
+    // set the cfg
 
-    mprint("Set modem config: %s\n", MODEM_CONFIG_STR[index]);
+    uint8_t reg_bw = 7;
+    if (bandwidth_khz <= 125){
+      reg_bw = 7;
+    }else if (bandwidth_khz <= 250){
+      reg_bw = 8;
+    }else {
+      reg_bw = 9;
+    }
+    cfg.reg_1d = (reg_bw << 4) | (coding_rate << 1) | (implicit_header? 1 : 0);
+    cfg.reg_1e = (spreading_factor << 4) | (crc? 0x04 : 0);
+
+    // turn on autoAGC (0x4)
+    //cfg.reg_26 = 0x4| (mobile? 0x8 : 0);
+
+    // LNA gain set by reg LnaGain
+    cfg.reg_26 =  (mobile? 0x8 : 0);
+
+
+    if ( (cfg.reg_1d == _current_modem_config.reg_1d) &&
+          (cfg.reg_1e == _current_modem_config.reg_1e) &&
+          (cfg.reg_26 == _current_modem_config.reg_26) )
+        return true;
+
+    setModemRegisters(&cfg);
     return true;
   }
+
+  // Set one of the canned FSK Modem configs
+  // Returns true if its a valid choice
+  // bool RH_RF95::setModemConfig(ModemConfigChoice index)
+  // {
+  //   //mprint("SetmodemConfig!\n");
+  //   if (index > (signed int)(sizeof(MODEM_CONFIG_TABLE) / sizeof(ModemConfig))){
+  //     mprint("ERROR: Modem config out of bounds!\n");
+  //     return false;
+  //   }
+  //
+  //   // if it's the same radio modem config, don't change anything
+  //   if(index == this->_current_modem_config){
+  //     //mprint("Modem config already set\n");
+  //
+  //     return true;
+  //   }
+  //
+  //   // must wait for TX to finish
+  //   while (_mode == RHModeTx);
+  //   //force idle before changing config.
+  //   setModeIdle();
+  //
+  //   this->_current_modem_config = index;
+  //
+  //   ModemConfig cfg;
+  //   memcpy_P(&cfg, &MODEM_CONFIG_TABLE[index], sizeof(RH_RF95::ModemConfig));
+  //   setModemRegisters(&cfg);
+  //   delay(15);
+  //   mprint("Set modem config: %s\n", MODEM_CONFIG_STR[index]);
+  //   return true;
+  // }
 
   void RH_RF95::setEncoding(int sf, int cr){
     RH_RF95::setEncoding(sf, cr, true);

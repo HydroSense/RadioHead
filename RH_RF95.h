@@ -575,20 +575,20 @@ public:
   /// Caution: for some slow rates nad with ReliableDatagrams youi may need to increase the reply timeout
   /// with manager.setTimeout() to
   /// deal with the long transmission times.
-  typedef enum
-  {
-    NullConfig = 0,
-    Bw125Cr45Sf128,	   ///< Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on. Default medium range
-    Bw500Cr45Sf128,	           ///< Bw = 500 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on. Fast+short range
-    Bw31_25Cr48Sf512,	   ///< Bw = 31.25 kHz, Cr = 4/8, Sf = 512chips/symbol, CRC on. Slow+long range
-    Bw125Cr48Sf4096,           ///< Bw = 125 kHz, Cr = 4/8, Sf = 4096chips/symbol, CRC on. Slow+long range
-
-    Bw500Cr48Sf4096NoHeadNoCrc,
-    Bw500Cr48Sf4096,
-    Bw500Cr45Sf4096,
-    Bw500Cr48Sf4096Ldo,
-    Bw500Cr48Sf4096NoCrc,
-  } ModemConfigChoice;
+  // typedef enum
+  // {
+  //   NullConfig = 0,
+  //   Bw125Cr45Sf128,	   ///< Bw = 125 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on. Default medium range
+  //   Bw500Cr45Sf128,	           ///< Bw = 500 kHz, Cr = 4/5, Sf = 128chips/symbol, CRC on. Fast+short range
+  //   Bw31_25Cr48Sf512,	   ///< Bw = 31.25 kHz, Cr = 4/8, Sf = 512chips/symbol, CRC on. Slow+long range
+  //   Bw125Cr48Sf4096,           ///< Bw = 125 kHz, Cr = 4/8, Sf = 4096chips/symbol, CRC on. Slow+long range
+  //
+  //   Bw500Cr48Sf4096NoHeadNoCrc,
+  //   Bw500Cr48Sf4096,
+  //   Bw500Cr45Sf4096,
+  //   Bw500Cr48Sf4096Ldo,
+  //   Bw500Cr48Sf4096NoCrc,
+  // } ModemConfigChoice;
 
   /// Constructor. You can have multiple instances, but each instance must have its own
   /// interrupt and slave select pin. After constructing, you must call init() to initialise the interface
@@ -634,7 +634,15 @@ public:
   /// here, use setModemRegisters() with your own ModemConfig.
   /// \param[in] index The configuration choice.
   /// \return true if index is a valid choice.
-  bool        setModemConfig(ModemConfigChoice index);
+  //bool        setModemConfig(ModemConfigChoice index);
+  bool setModemConfig(
+    float     bandwidth_khz,
+    uint8_t   coding_rate,  // 4/4+x  where x = 1..4
+    bool      implicit_header, // 1=implicit header [fixed_length], 0=explicit header
+    uint8_t   spreading_factor, // 2^sf where sf = 6..12
+    bool      crc, // 1=include crc, 0=no crc sent with packet
+    bool      mobile //1=mobile node, 0=static node (sends extra bits!) also known as LOW_RD optimize
+  );
 
   /// Set the modem configuration using sf and cr. The frequency is fixed to 500khz
   /// \param[in] sf The spread factor
@@ -816,11 +824,11 @@ private:
 
   /// Index of next interrupt number to use in _deviceForInterrupt
   static uint8_t      _interruptCount;
+  //
+  // /// The configured interrupt pin connected to this instance
+  // uint8_t             _interruptPin;
 
-  /// The configured interrupt pin connected to this instance
-  uint8_t             _interruptPin;
-
-  uint8_t             _fhssInterruptPin;
+  // uint8_t             _fhssInterruptPin;
 
   /// The index into _deviceForInterrupt[] for this device (if an interrupt is already allocated)
   /// else 0xff
@@ -854,7 +862,8 @@ private:
   struct perf_counter _perf;
 
   // current radio modem config
-  ModemConfigChoice _current_modem_config;
+  //ModemConfigChoice _current_modem_config;
+  ModemConfig _current_modem_config;
 };
 
 /// @example rf95_client.pde
